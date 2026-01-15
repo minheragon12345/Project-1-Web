@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/authService';
 import { toast } from 'react-toastify';
-import './Login.css'; 
+import './Login.css';
 
 const Login = () => {
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
   });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { email, password } = formData;
+
+  useEffect(() => {
+    try {
+      const msg = sessionStorage.getItem('auth_error');
+      if (msg) {
+        sessionStorage.removeItem('auth_error');
+        toast.error(msg);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const onChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

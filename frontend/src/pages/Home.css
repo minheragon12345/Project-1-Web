@@ -120,7 +120,7 @@
   align-items: center;
 }
 
-.btn-add, .btn-logout, .btn-trash-view, .btn-back, .btn-theme-toggle {
+.btn-add, .btn-logout, .btn-trash-view, .btn-back, .btn-theme-toggle, .btn-admin, .btn-staff {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -170,6 +170,24 @@
   padding: 0;
 }
 .btn-theme-toggle:hover { background-color: var(--border-primary); }
+
+.btn-admin {
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+}
+
+.btn-admin:hover {
+  background-color: var(--border-primary);
+}
+
+.btn-staff {
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+}
+
+.btn-staff:hover {
+  background-color: var(--border-primary);
+}
 
 .notes-grid {
   display: grid;

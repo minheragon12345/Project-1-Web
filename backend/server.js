@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const connectDB = require('./src/config/db');
 const authController = require('./src/controller/authController');
 const noteController = require('./src/controller/noteController');
+const adminController = require('./src/controller/adminController');
 
 dotenv.config();
 connectDB();
@@ -14,6 +15,7 @@ app.use(express.json());
 
 app.use('/api/auth', authController);
 app.use('/api/notes', noteController);
+app.use('/api/admin', adminController);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -5,7 +5,7 @@ import {
   restoreNote, deleteNotePermanent 
 } from '../services/noteService';
 import { toast } from 'react-toastify';
-import { Plus, Trash2, Edit3, X, LogOut, Loader, RefreshCcw, Archive, ChevronLeft, ChevronRight, Moon, Sun, Search } from 'lucide-react'; 
+import { Plus, Trash2, Edit3, X, LogOut, Loader, RefreshCcw, Archive, ChevronLeft, ChevronRight, Moon, Sun, Search, Shield, UserCog } from 'lucide-react'; 
 import './Home.css';
 
 const Home = () => {
@@ -26,7 +26,7 @@ const Home = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentNoteId, setCurrentNoteId] = useState(null);
   
-  const [user] = useState(() => {
+  const [user, setUser] = useState(() => {
     try {
       const userStr = localStorage.getItem('user');
       return userStr ? JSON.parse(userStr) : null;
@@ -34,6 +34,20 @@ const Home = () => {
       return null;
     }
   });
+
+  // Keep user state in sync with localStorage (e.g., /auth/me on app load)
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        setUser(userStr ? JSON.parse(userStr) : null);
+      } catch {
+        setUser(null);
+      }
+    };
+    window.addEventListener('authChange', handler);
+    return () => window.removeEventListener('authChange', handler);
+  }, []);
 
   const navigate = useNavigate();
 
@@ -201,6 +215,16 @@ const Home = () => {
           </div>
 
           <div className="action-buttons">
+            {user?.role === 'admin' && (
+              <button className="btn-admin" onClick={() => navigate('/admin')} title="Admin">
+                <Shield size={20} /> Admin
+              </button>
+            )}
+            {(user?.role === 'admin' || user?.role === 'moderator') && (
+              <button className="btn-staff" onClick={() => navigate('/staff')} title="Staff Notes">
+                <UserCog size={20} /> Staff
+              </button>
+            )}
             <button className="btn-theme-toggle" onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')} title="Đổi giao diện">
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
