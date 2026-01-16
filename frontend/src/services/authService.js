@@ -5,7 +5,7 @@ export const login = async (email, password) => {
     const response = await API.post('/auth/login', { email, password });
     return response.data; 
   } catch (error) {
-    const message = error.response?.data?.message || "Đăng nhập thất bại!";
+    const message = error.response?.data?.message || error.message || "Đăng nhập thất bại!";
     throw new Error(message);
   }
 };
