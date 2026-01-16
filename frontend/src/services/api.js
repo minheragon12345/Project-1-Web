@@ -26,9 +26,6 @@ API.interceptors.response.use(
 
     // Token invalid / expired
     if (status === 401) {
-      try {
-        sessionStorage.setItem('auth_error', data?.message || 'Lỗi xác thực, vui lòng đăng nhập lại');
-      } catch {}
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -37,20 +34,14 @@ API.interceptors.response.use(
 
     // Banned user (force logout)
     if (status === 403 && data?.code === 'USER_BANNED') {
-    const url = error?.config?.url || '';
-    const isLoginRequest = url.includes('/auth/login');
-    const hasToken = !!localStorage.getItem('token');
-    if (hasToken && !isLoginRequest) {
       try {
         sessionStorage.setItem('auth_error', data?.message || 'Tài khoản đã bị khóa');
       } catch {}
-
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
 
     return Promise.reject(error);
   }

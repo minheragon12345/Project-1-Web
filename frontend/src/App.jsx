@@ -35,6 +35,7 @@ function App() {
     return () => window.removeEventListener('authChange', handler);
   }, []);
 
+  // On app load, if we have a token but no user in storage, fetch /auth/me
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -49,6 +50,7 @@ function App() {
           window.dispatchEvent(new Event('authChange'));
         }
       } catch {
+        // handled by interceptor
       }
     })();
   }, [user]);

@@ -10,10 +10,13 @@ const Admin = () => {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('users');
+
+  // users
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [userSearch, setUserSearch] = useState('');
 
+  // audit logs
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logAction, setLogAction] = useState('');

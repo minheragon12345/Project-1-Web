@@ -11,8 +11,33 @@ import {
   deleteAnyNotePermanent,
 } from '../services/staffService';
 
-import { ArrowLeft, UserCog, Search, RefreshCcw, Edit3, Trash2, RotateCcw, Save, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  UserCog,
+  Search,
+  RefreshCcw,
+  Edit3,
+  Trash2,
+  RotateCcw,
+  Save,
+  X,
+} from 'lucide-react';
 import './Staff.css';
+
+const NOTE_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
+
+function getProgressValue(note) {
+  if (typeof note?.progress === 'number') return Math.max(0, Math.min(100, note.progress));
+  if (note?.status === 'done') return 100;
+  return 0;
+}
+
+function toDateInputValue(dateLike) {
+  if (!dateLike) return '';
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
 
 const Staff = () => {
   const navigate = useNavigate();
@@ -27,6 +52,7 @@ const Staff = () => {
   }, []);
 
   const isAdmin = currentUser?.role === 'admin';
+
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
 
@@ -35,10 +61,19 @@ const Staff = () => {
   const [notesIncludeDeleted, setNotesIncludeDeleted] = useState(false);
   const [notesUserId, setNotesUserId] = useState('');
 
+  // edit modal
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
-  const [form, setForm] = useState({ title: '', content: '', status: 'not_done', priority: 0 });
+  const [form, setForm] = useState({
+    title: '',
+    content: '',
+    status: 'not_done',
+    progress: 0,
+    category: 'Other',
+    deadline: '',
+    priority: 0,
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -91,11 +126,15 @@ const Staff = () => {
   }, [notesSearch, notesIncludeDeleted, notesUserId]);
 
   const openEdit = (note) => {
+    const p = getProgressValue(note);
     setEditingNote(note);
     setForm({
       title: note?.title || '',
       content: note?.content || '',
       status: note?.status || 'not_done',
+      progress: p,
+      category: note?.category || 'Other',
+      deadline: toDateInputValue(note?.deadline),
       priority: typeof note?.priority === 'number' ? note.priority : 0,
     });
     setShowModal(true);
@@ -110,7 +149,15 @@ const Staff = () => {
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [name]: name === 'priority' ? Number(value) : value,
+      [name]: name === 'priority' || name === 'progress' ? Number(value) : value,
+    }));
+  };
+
+  const onStatusSelect = (e) => {
+    const v = e.target.value;
+    setForm((prev) => ({
+      ...prev,
+      status: v === 'cancelled' ? 'cancelled' : 'not_done',
     }));
   };
 
@@ -119,7 +166,17 @@ const Staff = () => {
     if (!editingNote?._id) return;
     setSaving(true);
     try {
-      await updateAnyNote(editingNote._id, form);
+      const payload = {
+        title: form.title,
+        content: form.content,
+        status: form.status,
+        progress: form.progress,
+        category: form.category,
+        deadline: form.deadline,
+        priority: form.priority,
+      };
+
+      await updateAnyNote(editingNote._id, payload);
       toast.success('Đã cập nhật ghi chú');
       closeModal();
       loadNotes();
@@ -192,7 +249,7 @@ const Staff = () => {
           <div className="search">
             <Search size={18} />
             <input
-              placeholder="Tìm title / content..."
+              placeholder="Tìm title / content / category..."
               value={notesSearch}
               onChange={(e) => setNotesSearch(e.target.value)}
             />
@@ -235,7 +292,10 @@ const Staff = () => {
                 <tr>
                   <th>User</th>
                   <th>Title</th>
+                  <th>Category</th>
+                  <th>Progress</th>
                   <th>Status</th>
+                  <th>Deadline</th>
                   <th>Priority</th>
                   <th>Deleted</th>
                   <th>Updated</th>
@@ -243,53 +303,59 @@ const Staff = () => {
                 </tr>
               </thead>
               <tbody>
-                {notes.map((n) => (
-                  <tr key={n._id}>
-                    <td>
-                      {n.user ? (
-                        <>
-                          <strong>{n.user.username}</strong>
-                          <div className="muted">{n.user.email}</div>
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td>
-                      <strong>{n.title || '(no title)'}</strong>
-                      <div className="muted line-clamp">{n.content}</div>
-                    </td>
-                    <td>{n.status}</td>
-                    <td>{typeof n.priority === 'number' ? n.priority : '—'}</td>
-                    <td>{n.isDeleted ? 'true' : 'false'}</td>
-                    <td>{n.updatedAt ? new Date(n.updatedAt).toLocaleString('vi-VN') : '—'}</td>
-                    <td className="actions">
-                      <button className="btn" onClick={() => openEdit(n)} title="Sửa">
-                        <Edit3 size={18} />
-                      </button>
+                {notes.map((n) => {
+                  const p = getProgressValue(n);
+                  return (
+                    <tr key={n._id}>
+                      <td>
+                        {n.user ? (
+                          <>
+                            <strong>{n.user.username}</strong>
+                            <div className="muted">{n.user.email}</div>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        <strong>{n.title || '(no title)'}</strong>
+                        <div className="muted line-clamp">{n.content}</div>
+                      </td>
+                      <td>{n.category || 'Other'}</td>
+                      <td>{p}%</td>
+                      <td>{n.status}</td>
+                      <td>{n.deadline ? new Date(n.deadline).toLocaleDateString('vi-VN') : '—'}</td>
+                      <td>{typeof n.priority === 'number' ? n.priority : '—'}</td>
+                      <td>{n.isDeleted ? 'true' : 'false'}</td>
+                      <td>{n.updatedAt ? new Date(n.updatedAt).toLocaleString('vi-VN') : '—'}</td>
+                      <td className="actions">
+                        <button className="btn" onClick={() => openEdit(n)} title="Sửa">
+                          <Edit3 size={18} />
+                        </button>
 
-                      {!n.isDeleted ? (
-                        <button className="btn danger" onClick={() => doTrash(n._id)} title="Trash">
-                          <Trash2 size={18} />
-                        </button>
-                      ) : (
-                        <button className="btn" onClick={() => doRestore(n._id)} title="Restore">
-                          <RotateCcw size={18} />
-                        </button>
-                      )}
+                        {!n.isDeleted ? (
+                          <button className="btn danger" onClick={() => doTrash(n._id)} title="Trash">
+                            <Trash2 size={18} />
+                          </button>
+                        ) : (
+                          <button className="btn" onClick={() => doRestore(n._id)} title="Restore">
+                            <RotateCcw size={18} />
+                          </button>
+                        )}
 
-                      {isAdmin && (
-                        <button className="btn danger" onClick={() => doDeletePermanent(n._id)} title="Xóa vĩnh viễn">
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        {isAdmin && (
+                          <button className="btn danger" onClick={() => doDeletePermanent(n._id)} title="Xóa vĩnh viễn">
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {notes.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="empty">Không có notes</td>
+                    <td colSpan={10} className="empty">Không có notes</td>
                   </tr>
                 )}
               </tbody>
@@ -321,17 +387,46 @@ const Staff = () => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Status</label>
-                  <select name="status" value={form.status} onChange={onChange}>
-                    <option value="not_done">not_done</option>
-                    <option value="done">done</option>
-                    <option value="cancelled">cancelled</option>
+                  <label>Category</label>
+                  <select name="category" value={form.category} onChange={onChange}>
+                    {NOTE_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>Priority</label>
                   <input name="priority" type="number" min={0} max={1024} value={form.priority} onChange={onChange} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Progress</label>
+                  <input
+                    name="progress"
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={form.progress}
+                    onChange={onChange}
+                    disabled={form.status === 'cancelled'}
+                  />
+                  <div className="muted">{form.progress}%</div>
+                </div>
+
+                <div className="form-group">
+                  <label>Status</label>
+                  <select value={form.status === 'cancelled' ? 'cancelled' : 'active'} onChange={onStatusSelect}>
+                    <option value="active">Active</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Deadline</label>
+                  <input name="deadline" type="date" value={form.deadline} onChange={onChange} />
                 </div>
               </div>
 

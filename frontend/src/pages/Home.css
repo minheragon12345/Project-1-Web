@@ -225,7 +225,7 @@
 
 .status-badge {
   font-size: 0.75rem;
-  padding: 4px 10px;
+  padding: 4px 30px;
   border-radius: 20px;
   font-weight: 700;
   text-transform: uppercase;
@@ -234,6 +234,8 @@
 .status-badge.not-done { background: var(--surface-secondary); color: var(--text-secondary); }
 .status-badge.done { background: #dcfce7; color: #166534; }
 .status-badge.cancelled { background: #fee2e2; color: #991b1b; }
+.status-badge.in-progress { background: #fef7e2; color: #c77614; }
+.status-badge.not-started { background: #e2ecfe; color: #144dc7; }
 
 .priority-badge {
   font-size: 0.75rem;
@@ -421,4 +423,70 @@
 .action-btn.delete:hover svg, 
 .action-btn.delete-forever:hover svg {
   stroke: var(--danger-text);
+}
+
+.category-badge {
+  display: inline-flex;
+  padding: 4px 30px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--border-secondary);
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+
+.note-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.note-deadline {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.note-deadline.overdue {
+  color: var(--danger-text);
+  font-weight: 700;
+}
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-secondary);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--primary-accent);
+}
+
+.progress-text {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  min-width: 42px;
+  text-align: right;
+}
+
+.form-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 6px;
 }

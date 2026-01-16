@@ -16,6 +16,56 @@ function isValidObjectId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
 
+
+const ALLOWED_NOTE_STATUSES = Note.NOTE_STATUSES || ['not_done', 'done', 'cancelled'];
+const ALLOWED_NOTE_CATEGORIES = Note.NOTE_CATEGORIES || ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
+
+function normalizeNoteStatus(status) {
+  if (status === undefined || status === null) return null;
+  return String(status).trim().toLowerCase();
+}
+
+function normalizeNoteCategory(category) {
+  if (category === undefined || category === null) return null;
+  const c = String(category).trim();
+  if (!c) return null;
+  const hit = ALLOWED_NOTE_CATEGORIES.find((x) => x.toLowerCase() === c.toLowerCase());
+  return hit || null;
+}
+
+function parseNotePriority(value) {
+  if (value === undefined) return undefined;
+  const n = Number(value);
+  if (!Number.isInteger(n)) return { error: 'priority must be an integer' };
+  if (n < 0 || n > 1024) return { error: 'priority must be between 0 and 1024' };
+  return n;
+}
+
+function parseNoteProgress(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return 0;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: 'progress must be a number (0..100)' };
+  const intN = Math.round(n);
+  if (intN < 0 || intN > 100) return { error: 'progress must be between 0 and 100' };
+  return intN;
+}
+
+function parseNoteDeadline(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return { error: 'deadline must be a valid date' };
+  return d;
+}
+
+function deriveNoteStatus(currentStatus, progress) {
+  if (currentStatus === 'cancelled') return 'cancelled';
+  if (typeof progress === 'number' && progress >= 100) return 'done';
+  if (typeof progress === 'number' && progress <= 0) return 'not_done';
+  return 'not_done';
+}
+
 // -------------------- USERS (ADMIN ONLY) --------------------
 router.get('/users', requireRole('admin'), async (req, res) => {
   try {
@@ -172,6 +222,7 @@ router.get('/notes', requireRole('admin', 'moderator'), async (req, res) => {
       query.$or = [
         { title: { $regex: keyword, $options: 'i' } },
         { content: { $regex: keyword, $options: 'i' } },
+        { category: { $regex: keyword, $options: 'i' } },
       ];
     }
 
@@ -188,7 +239,7 @@ router.get('/notes', requireRole('admin', 'moderator'), async (req, res) => {
 // Edit any note (ADMIN + MODERATOR)
 router.patch('/notes/:id', requireRole('admin', 'moderator'), async (req, res) => {
   const { id } = req.params;
-  const { title, content, status, priority } = req.body;
+  const { title, content, status, priority, progress, category, deadline } = req.body;
 
   try {
     if (!isValidObjectId(id)) {
@@ -202,14 +253,68 @@ router.patch('/notes/:id', requireRole('admin', 'moderator'), async (req, res) =
       title: note.title,
       content: note.content,
       status: note.status,
+      progress: note.progress,
+      category: note.category,
+      deadline: note.deadline,
       priority: note.priority,
       isDeleted: note.isDeleted,
     };
 
     if (typeof title !== 'undefined') note.title = title;
     if (typeof content !== 'undefined') note.content = content;
-    if (typeof status !== 'undefined') note.status = status;
-    if (typeof priority !== 'undefined') note.priority = priority;
+
+    if (typeof priority !== 'undefined') {
+      const parsedPriority = parseNotePriority(priority);
+      if (parsedPriority && parsedPriority.error) {
+        return res.status(400).json({ message: parsedPriority.error });
+      }
+      note.priority = parsedPriority;
+    }
+
+    if (typeof progress !== 'undefined') {
+      const parsedProgress = parseNoteProgress(progress);
+      if (parsedProgress && parsedProgress.error) {
+        return res.status(400).json({ message: parsedProgress.error });
+      }
+      note.progress = parsedProgress;
+    }
+
+    if (typeof category !== 'undefined') {
+      const normalizedCategory = normalizeNoteCategory(category);
+      if (category !== null && String(category).trim() && !normalizedCategory) {
+        return res.status(400).json({ message: `Invalid category. Allowed: ${ALLOWED_NOTE_CATEGORIES.join(', ')}` });
+      }
+      note.category = normalizedCategory || 'Other';
+    }
+
+    if (typeof deadline !== 'undefined') {
+      const parsedDeadline = parseNoteDeadline(deadline);
+      if (parsedDeadline && parsedDeadline.error) {
+        return res.status(400).json({ message: parsedDeadline.error });
+      }
+      note.deadline = parsedDeadline;
+    }
+
+    if (typeof status !== 'undefined') {
+      const normalizedStatus = normalizeNoteStatus(status);
+      if (!normalizedStatus || !ALLOWED_NOTE_STATUSES.includes(normalizedStatus)) {
+        return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED_NOTE_STATUSES.join(', ')}` });
+      }
+
+      note.status = normalizedStatus;
+
+      // Back-compat: status=done/not_done sets progress unless caller already set progress.
+      if (normalizedStatus === 'done' && typeof progress === 'undefined') note.progress = 100;
+      if (normalizedStatus === 'not_done' && typeof progress === 'undefined') note.progress = 0;
+      // cancelled keeps progress as-is.
+    }
+
+    if (typeof note.content !== 'undefined' && !String(note.content).trim()) {
+      return res.status(400).json({ message: 'content cannot be empty' });
+    }
+
+    // Derive status from progress unless cancelled.
+    note.status = deriveNoteStatus(note.status, note.progress);
 
     await note.save();
 
@@ -224,6 +329,9 @@ router.patch('/notes/:id', requireRole('admin', 'moderator'), async (req, res) =
           title: note.title,
           content: note.content,
           status: note.status,
+          progress: note.progress,
+          category: note.category,
+          deadline: note.deadline,
           priority: note.priority,
           isDeleted: note.isDeleted,
         },
