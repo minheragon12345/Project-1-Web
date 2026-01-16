@@ -23,8 +23,6 @@ async function writeAudit(req, { action, targetType, targetId, metadata }) {
       userAgent: String(req.headers['user-agent'] || ''),
     });
   } catch (err) {
-    // Never block request because of audit logging
-    // eslint-disable-next-line no-console
     console.error('Audit log write failed:', err.message);
   }
 }

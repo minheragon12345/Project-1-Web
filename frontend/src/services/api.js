@@ -32,14 +32,21 @@ API.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Banned user (force logout)
+    // Banned
     if (status === 403 && data?.code === 'USER_BANNED') {
-      try {
-        sessionStorage.setItem('auth_error', data?.message || 'Tài khoản đã bị khóa');
-      } catch {}
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const url = error?.config?.url || '';
+      const isLoginRequest = url.includes('/auth/login');
+      const hasToken = !!localStorage.getItem('token');
+
+      if (hasToken && !isLoginRequest) {
+        try {
+          sessionStorage.setItem('auth_error', data?.message || 'Tài khoản đã bị khóa');
+        } catch {}
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+
       return Promise.reject(error);
     }
 

@@ -19,7 +19,7 @@ export const getStaffNotes = async ({ userId = '', includeDeleted = false, searc
     const response = await API.get('/admin/notes', { params });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách ghi chú';
+    const message = error.response?.data?.message || 'Không thể lấy danh sách task';
     throw new Error(message);
   }
 };
@@ -29,7 +29,7 @@ export const updateAnyNote = async (noteId, payload) => {
     const response = await API.patch(`/admin/notes/${noteId}`, payload);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể cập nhật ghi chú';
+    const message = error.response?.data?.message || 'Không thể cập nhật task';
     throw new Error(message);
   }
 };
@@ -49,7 +49,7 @@ export const restoreAnyNote = async (noteId) => {
     const response = await API.patch(`/admin/notes/${noteId}/restore`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể khôi phục ghi chú';
+    const message = error.response?.data?.message || 'Không thể khôi phục task';
     throw new Error(message);
   }
 };

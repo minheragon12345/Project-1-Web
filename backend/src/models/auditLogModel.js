@@ -24,7 +24,6 @@ const AuditLogSchema = new mongoose.Schema(
       index: true,
     },
     targetId: {
-      // store as ObjectId when possible, but allow string for flexibility
       type: mongoose.Schema.Types.Mixed,
       required: true,
       index: true,

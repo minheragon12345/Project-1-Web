@@ -1,10 +1,7 @@
 const mongoose = require('mongoose');
-
 const NOTE_STATUSES = ['not_done', 'done', 'cancelled'];
-
-// Keep categories stable for filtering/search.
-// You can add more categories later without breaking existing notes.
 const NOTE_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
+const SHARE_PERMISSIONS = ['read', 'comment', 'write'];
 
 const NoteSchema = new mongoose.Schema(
   {
@@ -29,7 +26,6 @@ const NoteSchema = new mongoose.Schema(
       maxlength: 5000,
     },
 
-    // Cancellation is explicit. Otherwise, status is derived from progress.
     status: {
       type: String,
       enum: NOTE_STATUSES,
@@ -37,7 +33,6 @@ const NoteSchema = new mongoose.Schema(
       index: true,
     },
 
-    // 0..100. UI: 0 = Not started, 100 = Done.
     progress: {
       type: Number,
       min: 0,
@@ -67,6 +62,24 @@ const NoteSchema = new mongoose.Schema(
       index: true,
     },
 
+    sharedWith: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        permission: { type: String, enum: SHARE_PERMISSIONS, default: 'read' },
+        sharedAt: { type: Date, default: Date.now },
+        sharedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      },
+    ],
+
+    comments: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        text: { type: String, required: true, trim: true, maxlength: 2000 },
+        createdAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     isDeleted: {
       type: Boolean,
       default: false,
@@ -83,8 +96,10 @@ const NoteSchema = new mongoose.Schema(
 
 NoteSchema.index({ user: 1, isDeleted: 1, priority: -1, updatedAt: -1 });
 NoteSchema.index({ user: 1, category: 1, isDeleted: 1, updatedAt: -1 });
+NoteSchema.index({ 'sharedWith.user': 1, isDeleted: 1, updatedAt: -1 });
 
 const Note = mongoose.model('Note', NoteSchema);
 module.exports = Note;
 module.exports.NOTE_STATUSES = NOTE_STATUSES;
 module.exports.NOTE_CATEGORIES = NOTE_CATEGORIES;
+module.exports.SHARE_PERMISSIONS = SHARE_PERMISSIONS;

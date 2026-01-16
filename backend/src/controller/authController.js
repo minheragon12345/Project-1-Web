@@ -20,7 +20,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Never accept role from public registration
     const newUser = await User.create({ username, email: normalizedEmail, password, role: 'user' });
     const userResponse = newUser.toObject();
     delete userResponse.password;
@@ -68,7 +67,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Get current user profile
 router.get('/me', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('-password');

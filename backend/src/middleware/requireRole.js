@@ -1,6 +1,3 @@
-// Role-based authorization middleware
-// Usage: router.get('/admin-only', auth, requireRole('admin'), handler)
-
 module.exports = function requireRole(...allowedRoles) {
   const allowed = allowedRoles.flat().filter(Boolean);
   return function (req, res, next) {

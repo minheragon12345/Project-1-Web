@@ -66,7 +66,7 @@ function deriveNoteStatus(currentStatus, progress) {
   return 'not_done';
 }
 
-// -------------------- USERS (ADMIN ONLY) --------------------
+// Users
 router.get('/users', requireRole('admin'), async (req, res) => {
   try {
     const { search } = req.query;
@@ -89,7 +89,6 @@ router.get('/users', requireRole('admin'), async (req, res) => {
   }
 });
 
-// Lite users list for staff filters (ADMIN + MODERATOR)
 router.get('/users-lite', requireRole('admin', 'moderator'), async (req, res) => {
   try {
     const users = await User.find({})
@@ -101,7 +100,6 @@ router.get('/users-lite', requireRole('admin', 'moderator'), async (req, res) =>
   }
 });
 
-// Update user role (ADMIN ONLY)
 router.patch('/users/:id/role', requireRole('admin'), async (req, res) => {
   const { id } = req.params;
   const { role } = req.body;
@@ -117,7 +115,6 @@ router.patch('/users/:id/role', requireRole('admin'), async (req, res) => {
       return res.status(400).json({ message: `Invalid role. Allowed: ${allowedRoles.join(', ')}` });
     }
 
-    // Prevent locking yourself out of admin accidentally
     if (String(req.user.id) === String(id) && normalizedRole !== 'admin') {
       return res.status(400).json({ message: 'You cannot change your own role away from admin.' });
     }
@@ -144,7 +141,7 @@ router.patch('/users/:id/role', requireRole('admin'), async (req, res) => {
   }
 });
 
-// Ban / Unban a user (ADMIN ONLY)
+// Ban
 router.patch('/users/:id/ban', requireRole('admin'), async (req, res) => {
   const { id } = req.params;
   const { isBanned, reason } = req.body;
@@ -154,7 +151,6 @@ router.patch('/users/:id/ban', requireRole('admin'), async (req, res) => {
       return res.status(400).json({ message: 'Invalid user id' });
     }
 
-    // Prevent banning yourself
     if (String(req.user.id) === String(id)) {
       return res.status(400).json({ message: 'You cannot ban yourself.' });
     }
@@ -199,7 +195,6 @@ router.patch('/users/:id/ban', requireRole('admin'), async (req, res) => {
   }
 });
 
-// -------------------- NOTES (ADMIN + MODERATOR) --------------------
 router.get('/notes', requireRole('admin', 'moderator'), async (req, res) => {
   const { userId, includeDeleted, search } = req.query;
 
@@ -236,7 +231,7 @@ router.get('/notes', requireRole('admin', 'moderator'), async (req, res) => {
   }
 });
 
-// Edit any note (ADMIN + MODERATOR)
+// Edit
 router.patch('/notes/:id', requireRole('admin', 'moderator'), async (req, res) => {
   const { id } = req.params;
   const { title, content, status, priority, progress, category, deadline } = req.body;
@@ -302,22 +297,16 @@ router.patch('/notes/:id', requireRole('admin', 'moderator'), async (req, res) =
       }
 
       note.status = normalizedStatus;
-
-      // Back-compat: status=done/not_done sets progress unless caller already set progress.
       if (normalizedStatus === 'done' && typeof progress === 'undefined') note.progress = 100;
       if (normalizedStatus === 'not_done' && typeof progress === 'undefined') note.progress = 0;
-      // cancelled keeps progress as-is.
     }
 
     if (typeof note.content !== 'undefined' && !String(note.content).trim()) {
       return res.status(400).json({ message: 'content cannot be empty' });
     }
 
-    // Derive status from progress unless cancelled.
     note.status = deriveNoteStatus(note.status, note.progress);
-
     await note.save();
-
     await writeAudit(req, {
       action: 'NOTE_EDIT',
       targetType: 'Note',
@@ -345,7 +334,7 @@ router.patch('/notes/:id', requireRole('admin', 'moderator'), async (req, res) =
   }
 });
 
-// Soft-delete (trash) any note (ADMIN + MODERATOR)
+// Soft-delete
 router.patch('/notes/:id/trash', requireRole('admin', 'moderator'), async (req, res) => {
   const { id } = req.params;
 
@@ -375,7 +364,7 @@ router.patch('/notes/:id/trash', requireRole('admin', 'moderator'), async (req, 
   }
 });
 
-// Restore any note (ADMIN + MODERATOR)
+// Restore
 router.patch('/notes/:id/restore', requireRole('admin', 'moderator'), async (req, res) => {
   const { id } = req.params;
 
@@ -405,7 +394,7 @@ router.patch('/notes/:id/restore', requireRole('admin', 'moderator'), async (req
   }
 });
 
-// Permanently delete any note (ADMIN ONLY)
+// Delete
 router.delete('/notes/:id', requireRole('admin'), async (req, res) => {
   const { id } = req.params;
 
@@ -432,7 +421,7 @@ router.delete('/notes/:id', requireRole('admin'), async (req, res) => {
   }
 });
 
-// -------------------- AUDIT LOGS (ADMIN ONLY) --------------------
+// Logs
 router.get('/audit-logs', requireRole('admin'), async (req, res) => {
   try {
     const page = Math.max(parseInt(req.query.page || '1', 10), 1);

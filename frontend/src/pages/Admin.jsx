@@ -119,7 +119,7 @@ const Admin = () => {
 
         <div className="admin-actions">
           <button className="btn" onClick={() => navigate('/')}>
-            <ArrowLeft size={18} /> Về ghi chú
+            <ArrowLeft size={18} /> Về Task
           </button>
         </div>
       </div>

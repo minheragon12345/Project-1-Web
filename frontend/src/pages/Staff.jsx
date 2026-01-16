@@ -61,7 +61,7 @@ const Staff = () => {
   const [notesIncludeDeleted, setNotesIncludeDeleted] = useState(false);
   const [notesUserId, setNotesUserId] = useState('');
 
-  // edit modal
+  // edit
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
@@ -131,7 +131,7 @@ const Staff = () => {
     setForm({
       title: note?.title || '',
       content: note?.content || '',
-      status: note?.status || 'not_done',
+      status: note?.status === 'cancelled' ? 'cancelled' : 'not_done',
       progress: p,
       category: note?.category || 'Other',
       deadline: toDateInputValue(note?.deadline),
@@ -147,10 +147,22 @@ const Staff = () => {
 
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: name === 'priority' || name === 'progress' ? Number(value) : value,
-    }));
+
+    if (name === 'progress') {
+      const n = Number(value);
+      const v = Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
+      setForm((prev) => ({ ...prev, progress: v }));
+      return;
+    }
+
+    if (name === 'priority') {
+      const n = Number(value);
+      const v = Number.isFinite(n) ? Math.max(0, Math.min(1024, n)) : 0;
+      setForm((prev) => ({ ...prev, priority: v }));
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const onStatusSelect = (e) => {
@@ -169,15 +181,15 @@ const Staff = () => {
       const payload = {
         title: form.title,
         content: form.content,
-        status: form.status,
-        progress: form.progress,
+        status: form.status === 'cancelled' ? 'cancelled' : 'not_done',
+        progress: Math.max(0, Math.min(100, Number(form.progress) || 0)),
         category: form.category,
         deadline: form.deadline,
-        priority: form.priority,
+        priority: Math.max(0, Math.min(1024, Number(form.priority) || 0)),
       };
 
       await updateAnyNote(editingNote._id, payload);
-      toast.success('Đã cập nhật ghi chú');
+      toast.success('Đã cập nhật task');
       closeModal();
       loadNotes();
     } catch (err) {
@@ -188,7 +200,7 @@ const Staff = () => {
   };
 
   const doTrash = async (noteId) => {
-    if (!window.confirm('Chuyển ghi chú này vào thùng rác?')) return;
+    if (!window.confirm('Chuyển task này vào thùng rác?')) return;
     try {
       await trashAnyNote(noteId);
       toast.success('Đã chuyển vào thùng rác');
@@ -210,7 +222,7 @@ const Staff = () => {
 
   const doDeletePermanent = async (noteId) => {
     if (!isAdmin) return;
-    if (!window.confirm('Xóa VĨNH VIỄN ghi chú này?')) return;
+    if (!window.confirm('Xóa VĨNH VIỄN task này?')) return;
     try {
       await deleteAnyNotePermanent(noteId);
       toast.success('Đã xóa vĩnh viễn');
@@ -226,21 +238,21 @@ const Staff = () => {
         <div className="staff-title">
           <UserCog size={22} />
           <div>
-            <h2>Staff Notes</h2>
+            <h2>Staff Dashboard</h2>
             <p>
               {currentUser ? (
                 <>
                   Xin chào <strong>{currentUser.username}</strong> • role: <strong>{currentUser.role}</strong>
                 </>
               ) : (
-                'Quản lý ghi chú'
+                'Quản lý task'
               )}
             </p>
           </div>
         </div>
 
         <div className="staff-actions">
-          <button className="btn" onClick={() => navigate('/')}> <ArrowLeft size={18} /> Về ghi chú</button>
+          <button className="btn" onClick={() => navigate('/')}> <ArrowLeft size={18} /> Về task</button>
         </div>
       </div>
 
@@ -275,7 +287,7 @@ const Staff = () => {
               checked={notesIncludeDeleted}
               onChange={(e) => setNotesIncludeDeleted(e.target.checked)}
             />
-            Include deleted
+            Bao gồm thùng rác
           </label>
 
           <button className="btn" onClick={loadNotes} title="Refresh">
@@ -291,14 +303,14 @@ const Staff = () => {
               <thead>
                 <tr>
                   <th>User</th>
-                  <th>Title</th>
-                  <th>Category</th>
-                  <th>Progress</th>
-                  <th>Status</th>
+                  <th>Tiêu đề</th>
+                  <th>Danh mục</th>
+                  <th>Tiến độ</th>
+                  <th>Trạng thái</th>
                   <th>Deadline</th>
-                  <th>Priority</th>
-                  <th>Deleted</th>
-                  <th>Updated</th>
+                  <th>Ưu tiên</th>
+                  <th>Thúng rác</th>
+                  <th>Cập nhật lần cuối</th>
                   <th></th>
                 </tr>
               </thead>
@@ -326,7 +338,7 @@ const Staff = () => {
                       <td>{n.status}</td>
                       <td>{n.deadline ? new Date(n.deadline).toLocaleDateString('vi-VN') : '—'}</td>
                       <td>{typeof n.priority === 'number' ? n.priority : '—'}</td>
-                      <td>{n.isDeleted ? 'true' : 'false'}</td>
+                      <td>{n.isDeleted ? 'Đã xóa' : 'Chưa xóa'}</td>
                       <td>{n.updatedAt ? new Date(n.updatedAt).toLocaleString('vi-VN') : '—'}</td>
                       <td className="actions">
                         <button className="btn" onClick={() => openEdit(n)} title="Sửa">
@@ -338,7 +350,7 @@ const Staff = () => {
                             <Trash2 size={18} />
                           </button>
                         ) : (
-                          <button className="btn" onClick={() => doRestore(n._id)} title="Restore">
+                          <button className="btn" onClick={() => doRestore(n._id)} title="Hồi phục">
                             <RotateCcw size={18} />
                           </button>
                         )}
@@ -355,7 +367,7 @@ const Staff = () => {
 
                 {notes.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="empty">Không có notes</td>
+                    <td colSpan={10} className="empty">Không có tasks</td>
                   </tr>
                 )}
               </tbody>
@@ -368,7 +380,7 @@ const Staff = () => {
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Sửa ghi chú</h3>
+              <h3>Sửa task</h3>
               <button className="icon-btn" onClick={closeModal} title="Đóng">
                 <X size={18} />
               </button>
@@ -376,18 +388,13 @@ const Staff = () => {
 
             <form onSubmit={saveEdit}>
               <div className="form-group">
-                <label>Title</label>
+                <label>Tiêu đề</label>
                 <input name="title" value={form.title} onChange={onChange} placeholder="Title" />
-              </div>
-
-              <div className="form-group">
-                <label>Content</label>
-                <textarea name="content" value={form.content} onChange={onChange} rows={6} placeholder="Content" required />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Category</label>
+                  <label>Danh mục</label>
                   <select name="category" value={form.category} onChange={onChange}>
                     {NOTE_CATEGORIES.map((c) => (
                       <option key={c} value={c}>{c}</option>
@@ -396,38 +403,53 @@ const Staff = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Priority</label>
+                  <label>Ưu tiên</label>
                   <input name="priority" type="number" min={0} max={1024} value={form.priority} onChange={onChange} />
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Progress</label>
-                  <input
-                    name="progress"
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={form.progress}
-                    onChange={onChange}
-                    disabled={form.status === 'cancelled'}
-                  />
-                  <div className="muted">{form.progress}%</div>
-                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Tiến độ: {form.progress}%</label>
+                    <div className="progress-edit">
+                      <input
+                        name="progress"
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={form.progress}
+                        disabled={form.status === 'cancelled'}
+                        onChange={onChange}
+                      />
+                      <input
+                        name="progress"
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={form.progress}
+                        disabled={form.status === 'cancelled'}
+                        onChange={onChange}
+                      />
+                    </div>
+                  </div>
 
-                <div className="form-group">
-                  <label>Status</label>
-                  <select value={form.status === 'cancelled' ? 'cancelled' : 'active'} onChange={onStatusSelect}>
-                    <option value="active">Active</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <div className="form-group">
+                    <label>Trạng thái</label>
+                    <select value={form.status === 'cancelled' ? 'cancelled' : 'active'} onChange={onStatusSelect}>
+                      <option value="active">Đang làm</option>
+                      <option value="cancelled">Đã hủy</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-group">
                   <label>Deadline</label>
                   <input name="deadline" type="date" value={form.deadline} onChange={onChange} />
                 </div>
+
+              <div className="form-group">
+                <label>Thông tin</label>
+                <textarea name="content" value={form.content} onChange={onChange} rows={6} placeholder="Content" required />
               </div>
 
               <div className="modal-actions">

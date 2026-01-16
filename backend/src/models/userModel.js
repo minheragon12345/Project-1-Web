@@ -1,10 +1,5 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-
-// Roles
-// - user: normal user
-// - moderator: staff role; can access/edit other users' notes but cannot manage roles or view audit logs
-// - admin: full access
 const USER_ROLES = ['user', 'moderator', 'admin'];
 
 const UserSchema = new mongoose.Schema(
@@ -57,7 +52,6 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before saving (only when changed)
 UserSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
   this.password = await bcrypt.hash(this.password, 10);
