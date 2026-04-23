@@ -1,0 +1,89 @@
+const mongoose = require('mongoose');
+
+const PROJECT_STATUSES = ['active', 'archived'];
+const MEMBER_ROLES = ['owner', 'editor', 'viewer'];
+const BUDGET_TYPES = ['fixed', 'hourly'];
+
+const ProjectSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 120,
+    },
+
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+      default: '',
+    },
+
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+
+    members: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        role: { type: String, enum: MEMBER_ROLES, default: 'viewer' },
+        addedAt: { type: Date, default: Date.now },
+        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      },
+    ],
+
+    status: {
+      type: String,
+      enum: PROJECT_STATUSES,
+      default: 'active',
+      index: true,
+    },
+
+    startDate: {
+      type: Date,
+      default: null,
+    },
+
+    endDate: {
+      type: Date,
+      default: null,
+    },
+
+    budget: {
+      amount: { type: Number, min: 0, default: 0 },
+      currency: { type: String, trim: true, maxlength: 8, default: 'USD' },
+      type: { type: String, enum: BUDGET_TYPES, default: 'hourly' },
+    },
+
+    isPersonal: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { timestamps: true }
+);
+
+ProjectSchema.index({ owner: 1, isDeleted: 1, status: 1, updatedAt: -1 });
+ProjectSchema.index({ 'members.user': 1, isDeleted: 1, updatedAt: -1 });
+
+const Project = mongoose.model('Project', ProjectSchema);
+module.exports = Project;
+module.exports.PROJECT_STATUSES = PROJECT_STATUSES;
+module.exports.MEMBER_ROLES = MEMBER_ROLES;
+module.exports.BUDGET_TYPES = BUDGET_TYPES;

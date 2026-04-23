@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Note = require('../models/noteModel');
 const User = require('../models/userModel');
+const Project = require('../models/projectModel');
 const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
 
@@ -93,6 +94,30 @@ function ownerIdOf(note) {
   return String(note?.user?._id || note?.user || '');
 }
 
+// Returns 'owner' | 'editor' | 'viewer' | null based on a populated project doc
+function getProjectAccess(project, userId) {
+  if (!project) return null;
+  if (project.isDeleted) return null;
+  const uid = String(userId || '');
+  if (!uid) return null;
+  const ownerId = String(project.owner?._id || project.owner || '');
+  if (ownerId === uid) return 'owner';
+  const hit = Array.isArray(project.members)
+    ? project.members.find((m) => String(m?.user?._id || m?.user) === uid)
+    : null;
+  return hit?.role || null;
+}
+
+// Looks up a project by id and returns the user's role in it, or null.
+// Used when we only have a projectId (not a populated doc).
+async function fetchProjectRole(projectId, userId) {
+  if (!isValidObjectId(projectId)) return null;
+  const project = await Project.findOne({ _id: projectId, isDeleted: false })
+    .select('owner members isDeleted')
+    .lean();
+  return getProjectAccess(project, userId);
+}
+
 function getAccess(note, userId) {
   const uid = String(userId || '');
   if (!uid) return null;
@@ -101,8 +126,14 @@ function getAccess(note, userId) {
   const hit = Array.isArray(note?.sharedWith)
     ? note.sharedWith.find((s) => String(s?.user?._id || s?.user) === uid)
     : null;
+  if (hit?.permission) return hit.permission;
 
-  return hit?.permission || null;
+  // Fall back to project membership if the note has a populated project
+  const projAccess = getProjectAccess(note?.project, userId);
+  if (projAccess === 'owner' || projAccess === 'editor') return 'write';
+  if (projAccess === 'viewer') return 'read';
+
+  return null;
 }
 
 function canRead(note, userId) {
@@ -134,19 +165,38 @@ function toOwnerDto(populatedUserOrId) {
   };
 }
 
+function toProjectDto(projectOrId) {
+  if (!projectOrId) return null;
+  if (typeof projectOrId === 'string') return { id: projectOrId };
+  if (projectOrId._id) {
+    return {
+      id: String(projectOrId._id),
+      name: projectOrId.name,
+      isPersonal: projectOrId.isPersonal,
+    };
+  }
+  return { id: String(projectOrId) };
+}
+
 function mapNoteForList(noteLean, reqUserId) {
   const uid = String(reqUserId);
   const ownerId = String(noteLean?.user?._id || noteLean?.user || '');
   const isOwner = ownerId === uid;
 
-  const access = isOwner
-    ? 'owner'
-    : (noteLean?.sharedWith || []).find((s) => String(s?.user?._id || s?.user) === uid)?.permission || null;
+  const shareHit = (noteLean?.sharedWith || []).find((s) => String(s?.user?._id || s?.user) === uid)?.permission;
+  const projAccess = getProjectAccess(noteLean?.project, reqUserId);
+
+  let access = null;
+  if (isOwner) access = 'owner';
+  else if (shareHit) access = shareHit;
+  else if (projAccess === 'owner' || projAccess === 'editor') access = 'write';
+  else if (projAccess === 'viewer') access = 'read';
 
   return {
     ...noteLean,
     user: ownerId,
     owner: toOwnerDto(noteLean.user),
+    project: toProjectDto(noteLean.project),
     access,
     sharedCount: isOwner ? (noteLean?.sharedWith?.length || 0) : undefined,
     sharedWith: undefined,
@@ -155,11 +205,22 @@ function mapNoteForList(noteLean, reqUserId) {
 }
 
 router.post('/', async (req, res) => {
-  const { title, content, status, priority, progress, category, deadline } = req.body;
+  const { title, content, status, priority, progress, category, deadline, project: projectId } = req.body;
 
   try {
     if (!content || !String(content).trim()) {
       return res.status(400).json({ message: 'content is required' });
+    }
+
+    let projectRef = null;
+    if (projectId) {
+      if (!isValidObjectId(projectId)) {
+        return res.status(400).json({ message: 'Invalid project id' });
+      }
+      const role = await fetchProjectRole(projectId, req.userId);
+      if (!role) return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này.' });
+      if (role === 'viewer') return res.status(403).json({ message: 'Viewer không thể tạo task trong dự án.' });
+      projectRef = projectId;
     }
 
     const normalizedStatus = normalizeStatus(status);
@@ -200,6 +261,7 @@ router.post('/', async (req, res) => {
 
     const newNote = await Note.create({
       user: req.userId,
+      project: projectRef,
       title: title || '',
       content,
       status: statusValue,
@@ -220,10 +282,25 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const { status, search, category, scope } = req.query;
+  const { status, search, category, scope, projectId } = req.query;
 
   try {
     const uid = String(req.userId);
+
+    // If filtering by a specific project, verify the user is a member of that project
+    // and scope the query to that project only.
+    let projectScopeClause = null;
+    if (projectId) {
+      if (!isValidObjectId(projectId)) {
+        return res.status(400).json({ message: 'Invalid projectId' });
+      }
+      const role = await fetchProjectRole(projectId, uid);
+      if (!role) {
+        return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này.' });
+      }
+      projectScopeClause = { project: projectId };
+    }
+
     const ownershipOr =
       scope === 'mine'
         ? [{ user: uid }]
@@ -231,7 +308,13 @@ router.get('/', async (req, res) => {
           ? [{ 'sharedWith.user': uid }]
           : [{ user: uid }, { 'sharedWith.user': uid }];
 
-    const and = [{ isDeleted: false }, { $or: ownershipOr }];
+    const and = [{ isDeleted: false }];
+    if (projectScopeClause) {
+      // When filtering by project, membership already grants access — no further ownership filter
+      and.push(projectScopeClause);
+    } else {
+      and.push({ $or: ownershipOr });
+    }
 
     if (status) {
       const normalizedStatus = normalizeStatus(status);
@@ -267,6 +350,7 @@ router.get('/', async (req, res) => {
     const notes = await Note.find(query)
       .select('-comments')
       .populate('user', 'username email')
+      .populate('project', 'name isPersonal owner members isDeleted')
       .sort({ priority: -1, updatedAt: -1 })
       .lean();
 
@@ -298,13 +382,10 @@ router.get('/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid note id' });
     }
 
-    const note = await Note.findOne({
-      _id: id,
-      isDeleted: false,
-      $or: [{ user: req.userId }, { 'sharedWith.user': req.userId }],
-    })
+    const note = await Note.findOne({ _id: id, isDeleted: false })
       .select('-comments')
       .populate('user', 'username email')
+      .populate('project', 'name isPersonal owner members isDeleted')
       .lean();
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
@@ -321,23 +402,35 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { title, content, status, priority, progress, category, deadline } = req.body;
+  const { title, content, status, priority, progress, category, deadline, project: projectId } = req.body;
 
   try {
     if (!isValidObjectId(id)) {
       return res.status(400).json({ message: 'Invalid note id' });
     }
 
-    const note = await Note.findOne({
-      _id: id,
-      isDeleted: false,
-      $or: [{ user: req.userId }, { 'sharedWith.user': req.userId }],
-    });
+    const note = await Note.findOne({ _id: id, isDeleted: false })
+      .populate('project', 'name isPersonal owner members isDeleted');
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (!canWrite(note, req.userId)) {
       return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa task này.' });
+    }
+
+    // Allow moving a note to a different project; requester must be write-member of the target
+    if (projectId !== undefined) {
+      if (projectId === null || projectId === '') {
+        note.project = null;
+      } else {
+        if (!isValidObjectId(projectId)) {
+          return res.status(400).json({ message: 'Invalid project id' });
+        }
+        const role = await fetchProjectRole(projectId, req.userId);
+        if (!role) return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này.' });
+        if (role === 'viewer') return res.status(403).json({ message: 'Viewer không thể di chuyển task vào dự án này.' });
+        note.project = projectId;
+      }
     }
 
     if (title !== undefined) note.title = title;
@@ -425,11 +518,8 @@ router.patch('/:id/status', async (req, res) => {
       });
     }
 
-    const note = await Note.findOne({
-      _id: id,
-      isDeleted: false,
-      $or: [{ user: req.userId }, { 'sharedWith.user': req.userId }],
-    });
+    const note = await Note.findOne({ _id: id, isDeleted: false })
+      .populate('project', 'name isPersonal owner members isDeleted');
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
     if (!canWrite(note, req.userId)) {
@@ -715,11 +805,9 @@ router.get('/:id/comments', async (req, res) => {
   try {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid note id' });
 
-    const note = await Note.findOne({
-      _id: id,
-      isDeleted: false,
-      $or: [{ user: req.userId }, { 'sharedWith.user': req.userId }],
-    }).populate('comments.user', 'username email');
+    const note = await Note.findOne({ _id: id, isDeleted: false })
+      .populate('comments.user', 'username email')
+      .populate('project', 'name isPersonal owner members isDeleted');
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
     if (!canRead(note, req.userId)) return res.status(403).json({ message: 'Forbidden' });
@@ -741,11 +829,8 @@ router.post('/:id/comments', async (req, res) => {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid note id' });
     if (!text || !String(text).trim()) return res.status(400).json({ message: 'Comment text is required' });
 
-    const note = await Note.findOne({
-      _id: id,
-      isDeleted: false,
-      $or: [{ user: req.userId }, { 'sharedWith.user': req.userId }],
-    });
+    const note = await Note.findOne({ _id: id, isDeleted: false })
+      .populate('project', 'name isPersonal owner members isDeleted');
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
     if (!canComment(note, req.userId)) {

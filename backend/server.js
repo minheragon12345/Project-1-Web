@@ -5,6 +5,7 @@ const connectDB = require('./src/config/db');
 const authController = require('./src/controller/authController');
 const noteController = require('./src/controller/noteController');
 const adminController = require('./src/controller/adminController');
+const projectController = require('./src/controller/projectController');
 
 dotenv.config();
 connectDB();
@@ -15,6 +16,7 @@ app.use(express.json());
 
 app.use('/api/auth', authController);
 app.use('/api/notes', noteController);
+app.use('/api/projects', projectController);
 app.use('/api/admin', adminController);
 
 const PORT = process.env.PORT || 5000;

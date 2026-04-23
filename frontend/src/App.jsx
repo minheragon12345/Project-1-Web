@@ -8,6 +8,8 @@ import Register from './pages/Register';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Staff from './pages/Staff';
+import Projects from './pages/Projects';
+import ProjectDetail from './pages/ProjectDetail';
 import { me } from './services/authService';
 
 function App() {
@@ -65,6 +67,14 @@ function App() {
         <Route
           path="/"
           element={isAuthenticated ? <Home /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/projects"
+          element={isAuthenticated ? <Projects /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/projects/:id"
+          element={isAuthenticated ? <ProjectDetail /> : <Navigate to="/login" />}
         />
         <Route
           path="/staff"

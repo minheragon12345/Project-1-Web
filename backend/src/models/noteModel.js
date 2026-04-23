@@ -12,6 +12,32 @@ const NoteSchema = new mongoose.Schema(
       index: true,
     },
 
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Project',
+      default: null,
+      index: true,
+    },
+
+    assignee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+
+    estimatedHours: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    actualHours: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
     title: {
       type: String,
       trim: true,
@@ -97,6 +123,8 @@ const NoteSchema = new mongoose.Schema(
 NoteSchema.index({ user: 1, isDeleted: 1, priority: -1, updatedAt: -1 });
 NoteSchema.index({ user: 1, category: 1, isDeleted: 1, updatedAt: -1 });
 NoteSchema.index({ 'sharedWith.user': 1, isDeleted: 1, updatedAt: -1 });
+NoteSchema.index({ project: 1, isDeleted: 1, status: 1, priority: -1 });
+NoteSchema.index({ assignee: 1, isDeleted: 1, status: 1 });
 
 const Note = mongoose.model('Note', NoteSchema);
 module.exports = Note;

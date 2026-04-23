@@ -15,6 +15,7 @@ import {
   getNoteComments,
   addNoteComment,
 } from '../services/noteService';
+import { getProjects } from '../services/projectService';
 import { toast } from 'react-toastify';
 import {
   Plus,
@@ -34,6 +35,7 @@ import {
   UserCog,
   Share2,
   MessageSquare,
+  FolderKanban,
 } from 'lucide-react';
 import './Home.css';
 
@@ -117,6 +119,10 @@ const Home = () => {
   const [scopeFilter, setScopeFilter] = useState('all'); // all | mine | shared
   const [dueFilter, setDueFilter] = useState('all'); // all | overdue | dueSoon | noDeadline | done
 
+  // Projects
+  const [projects, setProjects] = useState([]);
+  const [projectFilter, setProjectFilter] = useState('all'); // 'all' | projectId
+
   const [currentPage, setCurrentPage] = useState(1);
   const notesPerPage = 6;
 
@@ -130,6 +136,7 @@ const Home = () => {
     category: 'Other',
     deadline: '',
     priority: 1,
+    project: '',
   });
   const [isEditing, setIsEditing] = useState(false);
   const [currentNoteId, setCurrentNoteId] = useState(null);
@@ -201,7 +208,9 @@ const Home = () => {
     try {
       let response;
       if (viewMode === 'active') {
-        response = await getNotes(searchQuery);
+        const extra = {};
+        if (projectFilter && projectFilter !== 'all') extra.projectId = projectFilter;
+        response = await getNotes(searchQuery, 'all', extra);
       } else {
         response = await getTrashNotes();
       }
@@ -242,7 +251,19 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  }, [viewMode, searchQuery, performLogout]);
+  }, [viewMode, searchQuery, projectFilter, performLogout]);
+
+  // Load projects once for filter + modal dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getProjects({ scope: 'all', status: 'active' });
+        setProjects(Array.isArray(data?.projects) ? data.projects : []);
+      } catch {
+        // non-fatal: Home still works without project options
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -253,7 +274,7 @@ const Home = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [scopeFilter, dueFilter]);
+  }, [scopeFilter, dueFilter, projectFilter]);
 
   const handleOpenAddModal = () => {
     setNewNote({
@@ -264,6 +285,7 @@ const Home = () => {
       category: 'Other',
       deadline: '',
       priority: 1,
+      project: projectFilter && projectFilter !== 'all' ? projectFilter : '',
     });
     setIsEditing(false);
     setCurrentNoteId(null);
@@ -286,6 +308,7 @@ const Home = () => {
       category: note.category || 'Other',
       deadline: toDateInputValue(note.deadline),
       priority: typeof note.priority === 'number' ? note.priority : 1,
+      project: note.project?.id || note.project || '',
     });
 
     setCurrentNoteId(note._id || note.id);
@@ -299,6 +322,7 @@ const Home = () => {
       const payload = {
         ...newNote,
         progress: Math.max(0, Math.min(100, Number(newNote.progress) || 0)),
+        project: newNote.project || null,
       };
 
       if (isEditing) {
@@ -552,6 +576,14 @@ const Home = () => {
           </div>
 
           <div className="action-buttons">
+            <button
+              className="btn-admin"
+              onClick={() => navigate('/projects')}
+              title="Dự án"
+              style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
+            >
+              <FolderKanban size={20} /> Dự án
+            </button>
             {user?.role === 'admin' && (
               <button className="btn-admin" onClick={() => navigate('/admin')} title="Admin">
                 <Shield size={20} /> Admin
@@ -612,6 +644,23 @@ const Home = () => {
               >
                 Được chia sẻ
               </button>
+            </div>
+
+            <div className="filter-row">
+              <span className="filter-label">Dự án:</span>
+              <select
+                className="filter-chip"
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                style={{ padding: '6px 10px', borderRadius: 999 }}
+              >
+                <option value="all">Tất cả dự án</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.isPersonal ? ' (Cá nhân)' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="filter-row">
@@ -683,6 +732,20 @@ const Home = () => {
                     </div>
 
                     <div className="note-header-right">
+                      {note.project?.name ? (
+                        <span
+                          className="category-badge"
+                          title={`Dự án: ${note.project.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (note.project?.id) navigate(`/projects/${note.project.id}`);
+                          }}
+                          style={{ cursor: 'pointer', backgroundColor: '#eef2ff', color: '#4f46e5' }}
+                        >
+                          <FolderKanban size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                          {note.project.name}
+                        </span>
+                      ) : null}
                       <span className="category-badge">{note.category || 'Other'}</span>
                       <span className="priority-badge">{note.priority || 0}</span>
                     </div>
@@ -902,6 +965,22 @@ const Home = () => {
                     <option value="cancelled">Đã hủy</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label>Dự án</label>
+                <select
+                  className="custom-select"
+                  value={newNote.project || ''}
+                  onChange={(e) => setNewNote({ ...newNote, project: e.target.value })}
+                >
+                  <option value="">— Không thuộc dự án nào —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.isPersonal ? ' (Cá nhân)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
