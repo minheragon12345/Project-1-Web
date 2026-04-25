@@ -23,18 +23,18 @@ const Register = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      return toast.error('Mật khẩu nhập lại không khớp!');
+      return toast.error('Passwords do not match!');
     }
 
     setLoading(true);
     try {
       await register(username, email, password);
-      
-      toast.success('Đăng ký tài khoản thành công! Hãy đăng nhập.');
-      
+
+      toast.success('Account created successfully! Please sign in.');
+
       navigate('/login');
     } catch (err) {
-      toast.error(err.message || 'Đăng ký thất bại');
+      toast.error(err.message || 'Sign up failed');
     } finally {
       setLoading(false);
     }
@@ -43,16 +43,16 @@ const Register = () => {
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
-        <h2>Tạo Tài Khoản</h2>
+        <h2>Create Account</h2>
         <form onSubmit={onSubmit}>
           <div className="form-group">
-            <label>Tên người dùng</label>
+            <label>Username</label>
             <input
               type="text"
               name="username"
               value={username}
               onChange={onChange}
-              placeholder="Ví dụ: HoangAn123"
+              placeholder="e.g. HoangAn123"
               required
             />
           </div>
@@ -68,33 +68,33 @@ const Register = () => {
             />
           </div>
           <div className="form-group">
-            <label>Mật khẩu</label>
+            <label>Password</label>
             <input
               type="password"
               name="password"
               value={password}
               onChange={onChange}
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder="At least 6 characters"
               required
             />
           </div>
           <div className="form-group">
-            <label>Xác nhận mật khẩu</label>
+            <label>Confirm password</label>
             <input
               type="password"
               name="confirmPassword"
               value={confirmPassword}
               onChange={onChange}
-              placeholder="Nhập lại mật khẩu"
+              placeholder="Re-enter your password"
               required
             />
           </div>
           <button type="submit" className="btn-auth" disabled={loading}>
-            {loading ? 'Đang xử lý...' : 'Đăng Ký'}
+            {loading ? 'Processing…' : 'Sign Up'}
           </button>
         </form>
         <p className="auth-footer">
-          Đã có tài khoản? <Link to="/login">Đăng nhập ngay</Link>
+          Already have an account? <Link to="/login">Sign in now</Link>
         </p>
       </div>
     </div>

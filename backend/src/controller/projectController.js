@@ -252,7 +252,7 @@ router.put('/:id', async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     if (!canWrite(project, req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa dự án này.' });
+      return res.status(403).json({ message: 'You do not have permission to edit this project.' });
     }
 
     if (name !== undefined) {
@@ -310,7 +310,7 @@ router.patch('/:id/archive', async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     if (!canManageMembers(project, req.userId)) {
-      return res.status(403).json({ message: 'Chỉ chủ dự án mới có thể lưu trữ.' });
+      return res.status(403).json({ message: 'Only the project owner can archive it.' });
     }
 
     project.status = project.status === 'archived' ? 'active' : 'archived';
@@ -339,11 +339,11 @@ router.delete('/:id', async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     if (ownerIdOf(project) !== String(req.userId)) {
-      return res.status(403).json({ message: 'Chỉ chủ dự án mới có thể xóa.' });
+      return res.status(403).json({ message: 'Only the project owner can delete it.' });
     }
 
     if (project.isPersonal) {
-      return res.status(400).json({ message: 'Không thể xóa dự án cá nhân.' });
+      return res.status(400).json({ message: 'Personal projects cannot be deleted.' });
     }
 
     project.isDeleted = true;
@@ -409,15 +409,15 @@ router.post('/:id/members', async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     if (!canManageMembers(project, req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền thêm thành viên.' });
+      return res.status(403).json({ message: 'You do not have permission to add members.' });
     }
 
     const targetEmail = String(email).trim().toLowerCase();
     const target = await User.findOne({ email: targetEmail }).select('_id username email');
-    if (!target) return res.status(404).json({ message: 'Không tìm thấy người dùng với email này.' });
+    if (!target) return res.status(404).json({ message: 'No user found with this email.' });
 
     if (String(target._id) === ownerIdOf(project)) {
-      return res.status(400).json({ message: 'Chủ dự án đã có toàn quyền.' });
+      return res.status(400).json({ message: 'The project owner already has full permissions.' });
     }
 
     project.members = Array.isArray(project.members) ? project.members : [];
@@ -468,7 +468,7 @@ router.patch('/:id/members/:memberUserId', async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     if (!canManageMembers(project, req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền thay đổi vai trò.' });
+      return res.status(403).json({ message: 'You do not have permission to change member roles.' });
     }
 
     const entry = (project.members || []).find((m) => String(m.user) === String(memberUserId));
@@ -501,7 +501,7 @@ router.delete('/:id/members/:memberUserId', async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     if (!canManageMembers(project, req.userId) && String(memberUserId) !== String(req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền xóa thành viên.' });
+      return res.status(403).json({ message: 'You do not have permission to remove members.' });
     }
 
     const before = project.members?.length || 0;

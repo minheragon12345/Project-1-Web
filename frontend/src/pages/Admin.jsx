@@ -30,7 +30,7 @@ const Admin = () => {
       const data = await getUsers(userSearch);
       setUsers(Array.isArray(data?.users) ? data.users : []);
     } catch (err) {
-      toast.error(err.message || 'Không thể lấy users');
+      toast.error(err.message || 'Failed to load users');
     } finally {
       setLoadingUsers(false);
     }
@@ -49,7 +49,7 @@ const Admin = () => {
       setLogTotal(typeof data?.total === 'number' ? data.total : 0);
       setLogPage(typeof data?.page === 'number' ? data.page : page);
     } catch (err) {
-      toast.error(err.message || 'Không thể lấy audit logs');
+      toast.error(err.message || 'Failed to load audit logs');
     } finally {
       setLoadingLogs(false);
     }
@@ -81,10 +81,10 @@ const Admin = () => {
   const handleRoleChange = async (userId, role) => {
     try {
       await updateUserRole(userId, role);
-      toast.success('Đã cập nhật role');
+      toast.success('Role updated');
       loadUsers();
     } catch (err) {
-      toast.error(err.message || 'Không thể cập nhật role');
+      toast.error(err.message || 'Failed to update role');
     }
   };
 
@@ -92,17 +92,17 @@ const Admin = () => {
     try {
       if (!u?._id) return;
       if (!u.isBanned) {
-        const reason = window.prompt('Nhập lý do ban (tùy chọn):', '') || '';
+        const reason = window.prompt('Enter ban reason (optional):', '') || '';
         await setUserBan(u._id, true, reason);
-        toast.success('Đã ban user');
+        toast.success('User banned');
       } else {
-        if (!window.confirm('Gỡ ban user này?')) return;
+        if (!window.confirm('Unban this user?')) return;
         await setUserBan(u._id, false, '');
-        toast.success('Đã gỡ ban');
+        toast.success('User unbanned');
       }
       loadUsers();
     } catch (err) {
-      toast.error(err.message || 'Không thể cập nhật ban');
+      toast.error(err.message || 'Failed to update ban status');
     }
   };
 
@@ -113,13 +113,13 @@ const Admin = () => {
           <Shield size={22} />
           <div>
             <h2>Admin</h2>
-            <p>Quản lý users, role, ban và audit logs</p>
+            <p>Manage users, roles, bans and audit logs</p>
           </div>
         </div>
 
         <div className="admin-actions">
           <button className="btn" onClick={() => navigate('/')}>
-            <ArrowLeft size={18} /> Về Task
+            <ArrowLeft size={18} /> Back to Tasks
           </button>
         </div>
       </div>
@@ -139,7 +139,7 @@ const Admin = () => {
             <div className="search">
               <Search size={18} />
               <input
-                placeholder="Tìm username / email..."
+                placeholder="Search username / email…"
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
               />
@@ -151,7 +151,7 @@ const Admin = () => {
           </div>
 
           {loadingUsers ? (
-            <div className="loading">Đang tải...</div>
+            <div className="loading">Loading…</div>
           ) : (
             <div className="table-wrap">
               <table className="table">
@@ -192,7 +192,7 @@ const Admin = () => {
                         <button
                           className={u.isBanned ? 'btn' : 'btn danger'}
                           onClick={() => handleBanToggle(u)}
-                          title={u.isBanned ? 'Gỡ ban' : 'Ban user'}
+                          title={u.isBanned ? 'Unban' : 'Ban user'}
                         >
                           {u.isBanned ? 'Unban' : 'Ban'}
                         </button>
@@ -202,7 +202,7 @@ const Admin = () => {
 
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="empty">Không có users</td>
+                      <td colSpan={4} className="empty">No users</td>
                     </tr>
                   )}
                 </tbody>
@@ -218,7 +218,7 @@ const Admin = () => {
             <div className="search">
               <FileText size={18} />
               <input
-                placeholder="Filter action (VD: NOTE_EDIT, USER_BAN, USER_ROLE_UPDATE...)"
+                placeholder="Filter action (e.g. NOTE_EDIT, USER_BAN, USER_ROLE_UPDATE…)"
                 value={logAction}
                 onChange={(e) => setLogAction(e.target.value)}
               />
@@ -238,7 +238,7 @@ const Admin = () => {
           </div>
 
           {loadingLogs ? (
-            <div className="loading">Đang tải logs...</div>
+            <div className="loading">Loading logs…</div>
           ) : (
             <div className="table-wrap">
               <table className="table">
@@ -281,7 +281,7 @@ const Admin = () => {
 
                   {logs.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="empty">Không có logs</td>
+                      <td colSpan={5} className="empty">No logs</td>
                     </tr>
                   )}
                 </tbody>

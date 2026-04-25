@@ -9,7 +9,7 @@ export const getProjects = async ({ search = '', scope = 'all', status = '' } = 
     const res = await API.get('/projects', { params });
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể tải danh sách dự án';
+    const message = error.response?.data?.message || 'Could not load projects';
     throw new Error(message);
   }
 };
@@ -19,7 +19,7 @@ export const getProject = async (id) => {
     const res = await API.get(`/projects/${id}`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể tải dự án';
+    const message = error.response?.data?.message || 'Could not load project';
     throw new Error(message);
   }
 };
@@ -29,7 +29,7 @@ export const createProject = async (data) => {
     const res = await API.post('/projects', data);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi tạo dự án';
+    const message = error.response?.data?.message || 'Failed to create project';
     throw new Error(message);
   }
 };
@@ -39,7 +39,7 @@ export const updateProject = async (id, data) => {
     const res = await API.put(`/projects/${id}`, data);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi cập nhật dự án';
+    const message = error.response?.data?.message || 'Failed to update project';
     throw new Error(message);
   }
 };
@@ -49,7 +49,7 @@ export const archiveProject = async (id) => {
     const res = await API.patch(`/projects/${id}/archive`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi lưu trữ dự án';
+    const message = error.response?.data?.message || 'Failed to archive project';
     throw new Error(message);
   }
 };
@@ -59,7 +59,7 @@ export const deleteProject = async (id) => {
     const res = await API.delete(`/projects/${id}`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi xóa dự án';
+    const message = error.response?.data?.message || 'Failed to delete project';
     throw new Error(message);
   }
 };
@@ -69,7 +69,7 @@ export const getProjectMembers = async (id) => {
     const res = await API.get(`/projects/${id}/members`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể tải danh sách thành viên';
+    const message = error.response?.data?.message || 'Could not load members';
     throw new Error(message);
   }
 };
@@ -79,7 +79,7 @@ export const addProjectMember = async (id, { email, role }) => {
     const res = await API.post(`/projects/${id}/members`, { email, role });
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể thêm thành viên';
+    const message = error.response?.data?.message || 'Could not add member';
     throw new Error(message);
   }
 };
@@ -89,7 +89,7 @@ export const updateProjectMemberRole = async (id, memberUserId, role) => {
     const res = await API.patch(`/projects/${id}/members/${memberUserId}`, { role });
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể cập nhật vai trò';
+    const message = error.response?.data?.message || 'Could not update role';
     throw new Error(message);
   }
 };
@@ -99,7 +99,7 @@ export const removeProjectMember = async (id, memberUserId) => {
     const res = await API.delete(`/projects/${id}/members/${memberUserId}`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể xóa thành viên';
+    const message = error.response?.data?.message || 'Could not remove member';
     throw new Error(message);
   }
 };

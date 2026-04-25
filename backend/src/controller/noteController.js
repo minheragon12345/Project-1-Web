@@ -218,8 +218,8 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ message: 'Invalid project id' });
       }
       const role = await fetchProjectRole(projectId, req.userId);
-      if (!role) return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này.' });
-      if (role === 'viewer') return res.status(403).json({ message: 'Viewer không thể tạo task trong dự án.' });
+      if (!role) return res.status(403).json({ message: 'You are not a member of this project.' });
+      if (role === 'viewer') return res.status(403).json({ message: 'Viewers cannot create tasks in this project.' });
       projectRef = projectId;
     }
 
@@ -296,7 +296,7 @@ router.get('/', async (req, res) => {
       }
       const role = await fetchProjectRole(projectId, uid);
       if (!role) {
-        return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này.' });
+        return res.status(403).json({ message: 'You are not a member of this project.' });
       }
       projectScopeClause = { project: projectId };
     }
@@ -415,7 +415,7 @@ router.put('/:id', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (!canWrite(note, req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa task này.' });
+      return res.status(403).json({ message: 'You do not have permission to edit this task.' });
     }
 
     // Allow moving a note to a different project; requester must be write-member of the target
@@ -427,8 +427,8 @@ router.put('/:id', async (req, res) => {
           return res.status(400).json({ message: 'Invalid project id' });
         }
         const role = await fetchProjectRole(projectId, req.userId);
-        if (!role) return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này.' });
-        if (role === 'viewer') return res.status(403).json({ message: 'Viewer không thể di chuyển task vào dự án này.' });
+        if (!role) return res.status(403).json({ message: 'You are not a member of this project.' });
+        if (role === 'viewer') return res.status(403).json({ message: 'Viewers cannot move tasks into this project.' });
         note.project = projectId;
       }
     }
@@ -523,7 +523,7 @@ router.patch('/:id/status', async (req, res) => {
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
     if (!canWrite(note, req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa task này.' });
+      return res.status(403).json({ message: 'You do not have permission to edit this task.' });
     }
 
     note.status = normalizedStatus;
@@ -558,7 +558,7 @@ router.delete('/:id', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (ownerIdOf(note) !== String(req.userId)) {
-      return res.status(403).json({ message: 'Chỉ chủ task mới có thể đưa vào thùng rác.' });
+      return res.status(403).json({ message: 'Only the task owner can move it to trash.' });
     }
 
     note.isDeleted = true;
@@ -590,7 +590,7 @@ router.patch('/:id/restore', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found in trash' });
 
     if (ownerIdOf(note) !== String(req.userId)) {
-      return res.status(403).json({ message: 'Chỉ chủ task mới có thể khôi phục.' });
+      return res.status(403).json({ message: 'Only the task owner can restore it.' });
     }
 
     note.isDeleted = false;
@@ -622,7 +622,7 @@ router.delete('/:id/hard', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found in trash' });
 
     if (ownerIdOf(note) !== String(req.userId)) {
-      return res.status(403).json({ message: 'Chỉ chủ task mới có thể xóa vĩnh viễn.' });
+      return res.status(403).json({ message: 'Only the task owner can permanently delete it.' });
     }
 
     await Note.deleteOne({ _id: id });
@@ -650,7 +650,7 @@ router.get('/:id/shares', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (!canManageShares(note, req)) {
-      return res.status(403).json({ message: 'Bạn không có quyền xem danh sách chia sẻ.' });
+      return res.status(403).json({ message: 'You do not have permission to view the share list.' });
     }
 
     const shares = (note.sharedWith || []).map((s) => ({
@@ -682,15 +682,15 @@ router.post('/:id/share', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (!canManageShares(note, req)) {
-      return res.status(403).json({ message: 'Bạn không có quyền chia sẻ task này.' });
+      return res.status(403).json({ message: 'You do not have permission to share this task.' });
     }
 
     const targetEmail = String(email).trim().toLowerCase();
     const target = await User.findOne({ email: targetEmail }).select('_id username email');
-    if (!target) return res.status(404).json({ message: 'Không tìm thấy người dùng với email này.' });
+    if (!target) return res.status(404).json({ message: 'No user found with this email.' });
 
     if (String(target._id) === ownerIdOf(note)) {
-      return res.status(400).json({ message: 'Bạn không thể chia sẻ cho chính chủ task.' });
+      return res.status(400).json({ message: 'You cannot share with the task owner.' });
     }
 
     note.sharedWith = Array.isArray(note.sharedWith) ? note.sharedWith : [];
@@ -742,7 +742,7 @@ router.patch('/:id/share/:shareUserId', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (!canManageShares(note, req)) {
-      return res.status(403).json({ message: 'Bạn không có quyền thay đổi chia sẻ.' });
+      return res.status(403).json({ message: 'You do not have permission to change shares.' });
     }
 
     const entry = (note.sharedWith || []).find((s) => String(s.user) === String(shareUserId));
@@ -775,7 +775,7 @@ router.delete('/:id/share/:shareUserId', async (req, res) => {
     if (!note) return res.status(404).json({ message: 'Note not found' });
 
     if (!canManageShares(note, req)) {
-      return res.status(403).json({ message: 'Bạn không có quyền xóa chia sẻ.' });
+      return res.status(403).json({ message: 'You do not have permission to remove shares.' });
     }
 
     const before = note.sharedWith?.length || 0;
@@ -834,7 +834,7 @@ router.post('/:id/comments', async (req, res) => {
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
     if (!canComment(note, req.userId)) {
-      return res.status(403).json({ message: 'Bạn không có quyền bình luận ở task này.' });
+      return res.status(403).json({ message: 'You do not have permission to comment on this task.' });
     }
 
     note.comments = Array.isArray(note.comments) ? note.comments : [];

@@ -5,7 +5,7 @@ export const getUsersLite = async () => {
     const response = await API.get('/admin/users-lite');
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách users';
+    const message = error.response?.data?.message || 'Could not load users';
     throw new Error(message);
   }
 };
@@ -19,7 +19,7 @@ export const getStaffNotes = async ({ userId = '', includeDeleted = false, searc
     const response = await API.get('/admin/notes', { params });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách task';
+    const message = error.response?.data?.message || 'Could not load tasks';
     throw new Error(message);
   }
 };
@@ -29,7 +29,7 @@ export const updateAnyNote = async (noteId, payload) => {
     const response = await API.patch(`/admin/notes/${noteId}`, payload);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể cập nhật task';
+    const message = error.response?.data?.message || 'Could not update task';
     throw new Error(message);
   }
 };
@@ -39,7 +39,7 @@ export const trashAnyNote = async (noteId) => {
     const response = await API.patch(`/admin/notes/${noteId}/trash`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể chuyển vào thùng rác';
+    const message = error.response?.data?.message || 'Could not move to trash';
     throw new Error(message);
   }
 };
@@ -49,7 +49,7 @@ export const restoreAnyNote = async (noteId) => {
     const response = await API.patch(`/admin/notes/${noteId}/restore`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể khôi phục task';
+    const message = error.response?.data?.message || 'Could not restore task';
     throw new Error(message);
   }
 };
@@ -59,7 +59,7 @@ export const deleteAnyNotePermanent = async (noteId) => {
     const response = await API.delete(`/admin/notes/${noteId}`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể xóa vĩnh viễn';
+    const message = error.response?.data?.message || 'Could not delete permanently';
     throw new Error(message);
   }
 };

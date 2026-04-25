@@ -5,7 +5,7 @@ export const login = async (email, password) => {
     const response = await API.post('/auth/login', { email, password });
     return response.data; 
   } catch (error) {
-    const message = error.response?.data?.message || error.message || "Đăng nhập thất bại!";
+    const message = error.response?.data?.message || error.message || "Login failed!";
     throw new Error(message);
   }
 };
@@ -15,17 +15,17 @@ export const me = async () => {
     const response = await API.get('/auth/me');
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy thông tin người dùng';
+    const message = error.response?.data?.message || 'Could not load user info';
     throw new Error(message);
   }
 };
 export const register = async (username, email, password) => {
   try {
     const response = await API.post('/auth/register', { username, email, password });
-    
+
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || "Đăng ký thất bại!";
+    const message = error.response?.data?.message || "Registration failed!";
     throw new Error(message);
   }
 };

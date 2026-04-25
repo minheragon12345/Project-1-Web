@@ -102,7 +102,7 @@ const Staff = () => {
       });
       setNotes(Array.isArray(data?.notes) ? data.notes : []);
     } catch (err) {
-      toast.error(err.message || 'Lỗi tải notes');
+      toast.error(err.message || 'Failed to load tasks');
     } finally {
       setLoading(false);
     }
@@ -189,46 +189,46 @@ const Staff = () => {
       };
 
       await updateAnyNote(editingNote._id, payload);
-      toast.success('Đã cập nhật task');
+      toast.success('Task updated');
       closeModal();
       loadNotes();
     } catch (err) {
-      toast.error(err.message || 'Không thể cập nhật');
+      toast.error(err.message || 'Could not update');
     } finally {
       setSaving(false);
     }
   };
 
   const doTrash = async (noteId) => {
-    if (!window.confirm('Chuyển task này vào thùng rác?')) return;
+    if (!window.confirm('Move this task to trash?')) return;
     try {
       await trashAnyNote(noteId);
-      toast.success('Đã chuyển vào thùng rác');
+      toast.success('Moved to trash');
       loadNotes();
     } catch (err) {
-      toast.error(err.message || 'Không thể chuyển vào thùng rác');
+      toast.error(err.message || 'Could not move to trash');
     }
   };
 
   const doRestore = async (noteId) => {
     try {
       await restoreAnyNote(noteId);
-      toast.success('Đã khôi phục');
+      toast.success('Restored');
       loadNotes();
     } catch (err) {
-      toast.error(err.message || 'Không thể khôi phục');
+      toast.error(err.message || 'Could not restore');
     }
   };
 
   const doDeletePermanent = async (noteId) => {
     if (!isAdmin) return;
-    if (!window.confirm('Xóa VĨNH VIỄN task này?')) return;
+    if (!window.confirm('PERMANENTLY delete this task?')) return;
     try {
       await deleteAnyNotePermanent(noteId);
-      toast.success('Đã xóa vĩnh viễn');
+      toast.success('Permanently deleted');
       loadNotes();
     } catch (err) {
-      toast.error(err.message || 'Không thể xóa');
+      toast.error(err.message || 'Could not delete');
     }
   };
 
@@ -242,17 +242,17 @@ const Staff = () => {
             <p>
               {currentUser ? (
                 <>
-                  Xin chào <strong>{currentUser.username}</strong> • role: <strong>{currentUser.role}</strong>
+                  Hi <strong>{currentUser.username}</strong> • role: <strong>{currentUser.role}</strong>
                 </>
               ) : (
-                'Quản lý task'
+                'Task management'
               )}
             </p>
           </div>
         </div>
 
         <div className="staff-actions">
-          <button className="btn" onClick={() => navigate('/')}> <ArrowLeft size={18} /> Về task</button>
+          <button className="btn" onClick={() => navigate('/')}> <ArrowLeft size={18} /> Back to Tasks</button>
         </div>
       </div>
 
@@ -261,7 +261,7 @@ const Staff = () => {
           <div className="search">
             <Search size={18} />
             <input
-              placeholder="Tìm title / content / category..."
+              placeholder="Search title / content / category…"
               value={notesSearch}
               onChange={(e) => setNotesSearch(e.target.value)}
             />
@@ -271,9 +271,9 @@ const Staff = () => {
             className="select"
             value={notesUserId}
             onChange={(e) => setNotesUserId(e.target.value)}
-            title="Filter theo user"
+            title="Filter by user"
           >
-            <option value="">Tất cả users</option>
+            <option value="">All users</option>
             {users.map((u) => (
               <option key={u._id} value={u._id}>
                 {u.username} ({u.role}{u.isBanned ? ', banned' : ''})
@@ -287,7 +287,7 @@ const Staff = () => {
               checked={notesIncludeDeleted}
               onChange={(e) => setNotesIncludeDeleted(e.target.checked)}
             />
-            Bao gồm thùng rác
+            Include trash
           </label>
 
           <button className="btn" onClick={loadNotes} title="Refresh">
@@ -296,21 +296,21 @@ const Staff = () => {
         </div>
 
         {loading ? (
-          <div className="loading">Đang tải...</div>
+          <div className="loading">Loading…</div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
                   <th>User</th>
-                  <th>Tiêu đề</th>
-                  <th>Danh mục</th>
-                  <th>Tiến độ</th>
-                  <th>Trạng thái</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Progress</th>
+                  <th>Status</th>
                   <th>Deadline</th>
-                  <th>Ưu tiên</th>
-                  <th>Thúng rác</th>
-                  <th>Cập nhật lần cuối</th>
+                  <th>Priority</th>
+                  <th>Trash</th>
+                  <th>Last updated</th>
                   <th></th>
                 </tr>
               </thead>
@@ -338,10 +338,10 @@ const Staff = () => {
                       <td>{n.status}</td>
                       <td>{n.deadline ? new Date(n.deadline).toLocaleDateString('vi-VN') : '—'}</td>
                       <td>{typeof n.priority === 'number' ? n.priority : '—'}</td>
-                      <td>{n.isDeleted ? 'Đã xóa' : 'Chưa xóa'}</td>
+                      <td>{n.isDeleted ? 'Deleted' : 'Active'}</td>
                       <td>{n.updatedAt ? new Date(n.updatedAt).toLocaleString('vi-VN') : '—'}</td>
                       <td className="actions">
-                        <button className="btn" onClick={() => openEdit(n)} title="Sửa">
+                        <button className="btn" onClick={() => openEdit(n)} title="Edit">
                           <Edit3 size={18} />
                         </button>
 
@@ -350,13 +350,13 @@ const Staff = () => {
                             <Trash2 size={18} />
                           </button>
                         ) : (
-                          <button className="btn" onClick={() => doRestore(n._id)} title="Hồi phục">
+                          <button className="btn" onClick={() => doRestore(n._id)} title="Restore">
                             <RotateCcw size={18} />
                           </button>
                         )}
 
                         {isAdmin && (
-                          <button className="btn danger" onClick={() => doDeletePermanent(n._id)} title="Xóa vĩnh viễn">
+                          <button className="btn danger" onClick={() => doDeletePermanent(n._id)} title="Delete permanently">
                             <Trash2 size={18} />
                           </button>
                         )}
@@ -367,7 +367,7 @@ const Staff = () => {
 
                 {notes.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="empty">Không có tasks</td>
+                    <td colSpan={10} className="empty">No tasks</td>
                   </tr>
                 )}
               </tbody>
@@ -380,21 +380,21 @@ const Staff = () => {
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Sửa task</h3>
-              <button className="icon-btn" onClick={closeModal} title="Đóng">
+              <h3>Edit task</h3>
+              <button className="icon-btn" onClick={closeModal} title="Close">
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={saveEdit}>
               <div className="form-group">
-                <label>Tiêu đề</label>
+                <label>Title</label>
                 <input name="title" value={form.title} onChange={onChange} placeholder="Title" />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Danh mục</label>
+                  <label>Category</label>
                   <select name="category" value={form.category} onChange={onChange}>
                     {NOTE_CATEGORIES.map((c) => (
                       <option key={c} value={c}>{c}</option>
@@ -403,14 +403,14 @@ const Staff = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Ưu tiên</label>
+                  <label>Priority</label>
                   <input name="priority" type="number" min={0} max={1024} value={form.priority} onChange={onChange} />
                 </div>
               </div>
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Tiến độ: {form.progress}%</label>
+                    <label>Progress: {form.progress}%</label>
                     <div className="progress-edit">
                       <input
                         name="progress"
@@ -434,10 +434,10 @@ const Staff = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Trạng thái</label>
+                    <label>Status</label>
                     <select value={form.status === 'cancelled' ? 'cancelled' : 'active'} onChange={onStatusSelect}>
-                      <option value="active">Đang làm</option>
-                      <option value="cancelled">Đã hủy</option>
+                      <option value="active">In progress</option>
+                      <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
                 </div>
@@ -448,16 +448,16 @@ const Staff = () => {
                 </div>
 
               <div className="form-group">
-                <label>Thông tin</label>
+                <label>Content</label>
                 <textarea name="content" value={form.content} onChange={onChange} rows={6} placeholder="Content" required />
               </div>
 
               <div className="modal-actions">
                 <button type="button" className="btn" onClick={closeModal}>
-                  <X size={18} /> Hủy
+                  <X size={18} /> Cancel
                 </button>
                 <button type="submit" className="btn primary" disabled={saving}>
-                  <Save size={18} /> {saving ? 'Đang lưu...' : 'Lưu'}
+                  <Save size={18} /> {saving ? 'Saving…' : 'Save'}
                 </button>
               </div>
             </form>

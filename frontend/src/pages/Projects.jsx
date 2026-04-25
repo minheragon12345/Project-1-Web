@@ -12,6 +12,7 @@ import {
   FolderKanban,
   Users,
   X,
+  Home,
 } from 'lucide-react';
 import {
   getProjects,
@@ -22,19 +23,19 @@ import {
 import './Projects.css';
 
 const SCOPE_OPTIONS = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'mine', label: 'Của tôi' },
-  { value: 'shared', label: 'Được chia sẻ' },
+  { value: 'all', label: 'All' },
+  { value: 'mine', label: 'Mine' },
+  { value: 'shared', label: 'Shared' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'Đang hoạt động' },
-  { value: 'archived', label: 'Đã lưu trữ' },
+  { value: 'active', label: 'Active' },
+  { value: 'archived', label: 'Archived' },
 ];
 
 const BUDGET_TYPES = [
-  { value: 'hourly', label: 'Theo giờ' },
-  { value: 'fixed', label: 'Cố định' },
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'fixed', label: 'Fixed' },
 ];
 
 const INITIAL_FORM = {
@@ -77,7 +78,7 @@ const Projects = () => {
       const data = await getProjects({ search, scope, status: statusFilter });
       setProjects(Array.isArray(data?.projects) ? data.projects : []);
     } catch (err) {
-      toast.error(err.message || 'Không thể tải danh sách dự án');
+      toast.error(err.message || 'Failed to load projects');
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ const Projects = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error('Tên dự án không được để trống');
+      toast.error('Project name cannot be empty');
       return;
     }
     setSaving(true);
@@ -121,11 +122,11 @@ const Projects = () => {
           type: form.budgetType || 'hourly',
         },
       });
-      toast.success('Đã tạo dự án');
+      toast.success('Project created');
       setShowModal(false);
       fetchProjects();
     } catch (err) {
-      toast.error(err.message || 'Lỗi khi tạo dự án');
+      toast.error(err.message || 'Failed to create project');
     } finally {
       setSaving(false);
     }
@@ -134,21 +135,21 @@ const Projects = () => {
   const handleArchive = async (project) => {
     try {
       await archiveProject(project.id);
-      toast.success(project.status === 'archived' ? 'Đã khôi phục dự án' : 'Đã lưu trữ dự án');
+      toast.success(project.status === 'archived' ? 'Project restored' : 'Project archived');
       fetchProjects();
     } catch (err) {
-      toast.error(err.message || 'Lỗi');
+      toast.error(err.message || 'Error');
     }
   };
 
   const handleDelete = async (project) => {
-    if (!window.confirm(`Xóa dự án "${project.name}"? Hành động này không thể hoàn tác.`)) return;
+    if (!window.confirm(`Delete project "${project.name}"? This action cannot be undone.`)) return;
     try {
       await deleteProject(project.id);
-      toast.success('Đã xóa dự án');
+      toast.success('Project deleted');
       fetchProjects();
     } catch (err) {
-      toast.error(err.message || 'Lỗi khi xóa dự án');
+      toast.error(err.message || 'Failed to delete project');
     }
   };
 
@@ -160,10 +161,10 @@ const Projects = () => {
         <div className="header-top-row">
           <h2>
             <FolderKanban size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-            Dự án
+            Projects
           </h2>
           <div className="user-greeting">
-            Chào, <strong style={{ marginLeft: 4 }}>{user?.username || 'Bạn'}</strong>
+            Hi, <strong style={{ marginLeft: 4 }}>{user?.username || 'there'}</strong>
           </div>
         </div>
 
@@ -172,7 +173,7 @@ const Projects = () => {
             <Search size={18} />
             <input
               type="text"
-              placeholder="Tìm kiếm dự án..."
+              placeholder="Search projects…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchProjects()}
@@ -198,12 +199,16 @@ const Projects = () => {
           </div>
 
           <div className="action-buttons">
-            <button className="btn-secondary" onClick={toggleTheme} title="Đổi giao diện">
+            <button className="btn-secondary" onClick={toggleTheme} title="Toggle theme">
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <button className="btn-secondary" onClick={() => navigate('/')} title="Home">
+              <Home size={18} />
+              <span>Home</span>
             </button>
             <button className="btn-primary" onClick={handleOpenCreate}>
               <Plus size={18} />
-              <span>Dự án mới</span>
+              <span>New project</span>
             </button>
           </div>
         </div>
@@ -212,12 +217,12 @@ const Projects = () => {
       {loading ? (
         <div className="projects-loading">
           <Loader className="spin" size={28} />
-          <span>Đang tải dự án...</span>
+          <span>Loading projects…</span>
         </div>
       ) : projects.length === 0 ? (
         <div className="projects-empty">
           <FolderKanban size={40} />
-          <p>Chưa có dự án nào. Nhấn "Dự án mới" để tạo dự án đầu tiên.</p>
+          <p>No projects yet. Click "New project" to create the first one.</p>
         </div>
       ) : (
         <div className="projects-grid">
@@ -245,30 +250,30 @@ const Projects = () => {
               {p.description ? <p className="project-description">{p.description}</p> : null}
 
               <div className="project-meta">
-                <span title="Thành viên">
+                <span title="Members">
                   <Users size={14} /> {p.memberCount}
                 </span>
                 {p.budget?.amount > 0 ? (
-                  <span title="Ngân sách">
+                  <span title="Budget">
                     {p.budget.currency} {Number(p.budget.amount).toLocaleString()}
                   </span>
                 ) : null}
-                {p.isPersonal ? <span className="badge-personal">Cá nhân</span> : null}
-                {p.status === 'archived' ? <span className="badge-archived">Đã lưu trữ</span> : null}
+                {p.isPersonal ? <span className="badge-personal">Personal</span> : null}
+                {p.status === 'archived' ? <span className="badge-archived">Archived</span> : null}
               </div>
 
               {p.role === 'owner' && !p.isPersonal ? (
                 <div className="project-card-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     className="icon-btn"
-                    title={p.status === 'archived' ? 'Khôi phục' : 'Lưu trữ'}
+                    title={p.status === 'archived' ? 'Restore' : 'Archive'}
                     onClick={() => handleArchive(p)}
                   >
                     <Archive size={16} />
                   </button>
                   <button
                     className="icon-btn danger"
-                    title="Xóa dự án"
+                    title="Delete project"
                     onClick={() => handleDelete(p)}
                   >
                     <Trash2 size={16} />
@@ -284,30 +289,30 @@ const Projects = () => {
         <div className="modal-backdrop" onClick={handleCloseModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Tạo dự án mới</h3>
-              <button className="icon-btn" onClick={handleCloseModal} title="Đóng">
+              <h3>New project</h3>
+              <button className="icon-btn" onClick={handleCloseModal} title="Close">
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleCreate} className="modal-form">
               <label>
-                <span>Tên dự án *</span>
+                <span>Project name *</span>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Ví dụ: Redesign Landing Page"
+                  placeholder="e.g. Redesign Landing Page"
                   maxLength={120}
                   autoFocus
                 />
               </label>
 
               <label>
-                <span>Mô tả</span>
+                <span>Description</span>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Mục tiêu, phạm vi, ghi chú..."
+                  placeholder="Goals, scope, notes…"
                   rows={3}
                   maxLength={2000}
                 />
@@ -315,7 +320,7 @@ const Projects = () => {
 
               <div className="form-row">
                 <label>
-                  <span>Ngày bắt đầu</span>
+                  <span>Start date</span>
                   <input
                     type="date"
                     value={form.startDate}
@@ -323,7 +328,7 @@ const Projects = () => {
                   />
                 </label>
                 <label>
-                  <span>Ngày kết thúc</span>
+                  <span>End date</span>
                   <input
                     type="date"
                     value={form.endDate}
@@ -334,7 +339,7 @@ const Projects = () => {
 
               <div className="form-row">
                 <label>
-                  <span>Ngân sách</span>
+                  <span>Budget</span>
                   <input
                     type="number"
                     min="0"
@@ -344,7 +349,7 @@ const Projects = () => {
                   />
                 </label>
                 <label>
-                  <span>Tiền tệ</span>
+                  <span>Currency</span>
                   <input
                     type="text"
                     maxLength={8}
@@ -355,7 +360,7 @@ const Projects = () => {
                   />
                 </label>
                 <label>
-                  <span>Loại</span>
+                  <span>Type</span>
                   <select
                     value={form.budgetType}
                     onChange={(e) => setForm({ ...form, budgetType: e.target.value })}
@@ -376,11 +381,11 @@ const Projects = () => {
                   onClick={handleCloseModal}
                   disabled={saving}
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={saving}>
                   {saving ? <Loader size={16} className="spin" /> : <Plus size={16} />}
-                  <span>{saving ? 'Đang tạo...' : 'Tạo dự án'}</span>
+                  <span>{saving ? 'Creating…' : 'Create project'}</span>
                 </button>
               </div>
             </form>

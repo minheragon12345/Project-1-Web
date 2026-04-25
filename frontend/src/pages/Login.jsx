@@ -44,10 +44,10 @@ const Login = () => {
       }
 
       window.dispatchEvent(new Event('authChange'));
-      toast.success('Đăng nhập thành công!');
+      toast.success('Signed in successfully!');
       navigate('/');
     } catch (err) {
-      toast.error(err.message || 'Đăng nhập thất bại');
+      toast.error(err.message || 'Sign in failed');
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ const Login = () => {
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
-        <h2>Đăng Nhập</h2>
+        <h2>Sign In</h2>
         <form onSubmit={onSubmit}>
           <div className="form-group">
             <label>Email</label>
@@ -65,27 +65,27 @@ const Login = () => {
               name="email"
               value={email}
               onChange={onChange}
-              placeholder="Nhập email của bạn"
+              placeholder="Enter your email"
               required
             />
           </div>
           <div className="form-group">
-            <label>Mật khẩu</label>
+            <label>Password</label>
             <input
               type="password"
               name="password"
               value={password}
               onChange={onChange}
-              placeholder="Nhập mật khẩu"
+              placeholder="Enter your password"
               required
             />
           </div>
           <button type="submit" className="btn-auth" disabled={loading}>
-            {loading ? 'Đang xử lý...' : 'Đăng Nhập'}
+            {loading ? 'Processing…' : 'Sign In'}
           </button>
         </form>
         <p className="auth-footer">
-          Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
+          Don't have an account? <Link to="/register">Sign up now</Link>
         </p>
       </div>
     </div>

@@ -7,7 +7,7 @@ export const getUsers = async (search = '') => {
     const response = await API.get('/admin/users', { params });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách người dùng';
+    const message = error.response?.data?.message || 'Could not load users';
     throw new Error(message);
   }
 };
@@ -17,7 +17,7 @@ export const updateUserRole = async (userId, role) => {
     const response = await API.patch(`/admin/users/${userId}/role`, { role });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể cập nhật role';
+    const message = error.response?.data?.message || 'Could not update role';
     throw new Error(message);
   }
 };
@@ -27,7 +27,7 @@ export const setUserBan = async (userId, isBanned, reason = '') => {
     const response = await API.patch(`/admin/users/${userId}/ban`, { isBanned, reason });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể cập nhật trạng thái ban';
+    const message = error.response?.data?.message || 'Could not update ban status';
     throw new Error(message);
   }
 };
@@ -41,7 +41,7 @@ export const getAuditLogs = async ({ page = 1, limit = 100, action = '', targetT
     const response = await API.get('/admin/audit-logs', { params });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy audit logs';
+    const message = error.response?.data?.message || 'Could not load audit logs';
     throw new Error(message);
   }
 };

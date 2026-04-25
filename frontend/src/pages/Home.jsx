@@ -41,9 +41,9 @@ import './Home.css';
 
 const NOTE_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
 const SHARE_PERMISSIONS = [
-  { value: 'read', label: 'Chỉ xem' },
-  { value: 'comment', label: 'Chỉ bình luận' },
-  { value: 'write', label: 'Có thể sửa' },
+  { value: 'read', label: 'View only' },
+  { value: 'comment', label: 'Comment only' },
+  { value: 'write', label: 'Can edit' },
 ];
 
 const DUE_SOON_DAYS = 3;
@@ -241,12 +241,12 @@ const Home = () => {
       setNotes(notesData);
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Lỗi fetch:', err);
+      console.error('Fetch error:', err);
       if (err.response && (err.response.status === 401 || err.response.status === 403)) {
-        toast.error('Phiên đăng nhập hết hạn.');
+        toast.error('Your session has expired.');
         performLogout();
       } else {
-        toast.error('Lỗi tải dữ liệu.');
+        toast.error('Failed to load data.');
       }
     } finally {
       setLoading(false);
@@ -294,7 +294,7 @@ const Home = () => {
 
   const handleEditClick = (note) => {
     if (!canEdit(note)) {
-      toast.info('Bạn chỉ có quyền xem/bình luận task này.');
+      toast.info('You only have view/comment access to this task.');
       return;
     }
 
@@ -327,42 +327,42 @@ const Home = () => {
 
       if (isEditing) {
         await updateNote(currentNoteId, payload);
-        toast.success('Đã cập nhật!');
+        toast.success('Task updated!');
       } else {
         await createNote(payload);
-        toast.success('Đã tạo mới!');
+        toast.success('Task created!');
       }
       setShowModal(false);
       fetchData();
     } catch (err) {
-      toast.error(err.message || 'Lưu thất bại.');
+      toast.error(err.message || 'Failed to save.');
     }
   };
 
   const handleDeleteAction = async (id, note) => {
     if (viewMode === 'active') {
       if (note && accessOf(note) !== 'owner') {
-        toast.info('Bạn không thể đưa task được chia sẻ vào thùng rác.');
+        toast.info('You cannot move a shared task to the trash.');
         return;
       }
 
-      if (window.confirm('Chuyển task này vào thùng rác?')) {
+      if (window.confirm('Move this task to trash?')) {
         try {
           await deleteNote(id);
-          toast.success('Đã chuyển vào thùng rác!');
+          toast.success('Moved to trash!');
           fetchData();
         } catch (err) {
-          toast.error(err.message || 'Lỗi xóa.');
+          toast.error(err.message || 'Failed to delete.');
         }
       }
     } else {
-      if (window.confirm('CẢNH BÁO: Hành động này không thể hoàn tác. Xóa vĩnh viễn?')) {
+      if (window.confirm('WARNING: This action cannot be undone. Delete permanently?')) {
         try {
           await deleteNotePermanent(id);
-          toast.success('Đã xóa vĩnh viễn!');
+          toast.success('Permanently deleted!');
           fetchData();
         } catch (err) {
-          toast.error(err.message || 'Lỗi xóa vĩnh viễn.');
+          toast.error(err.message || 'Failed to permanently delete.');
         }
       }
     }
@@ -371,10 +371,10 @@ const Home = () => {
   const handleRestore = async (id) => {
     try {
       await restoreNote(id);
-      toast.success('Đã khôi phục task!');
+      toast.success('Task restored!');
       fetchData();
     } catch (err) {
-      toast.error(err.message || 'Lỗi khôi phục.');
+      toast.error(err.message || 'Failed to restore.');
     }
   };
 
@@ -382,18 +382,18 @@ const Home = () => {
     const progress = getProgressValue(note);
 
     if (note?.status === 'cancelled') {
-      return <span className="status-badge cancelled">Đã hủy</span>;
+      return <span className="status-badge cancelled">Cancelled</span>;
     }
 
     if (progress >= 100) {
-      return <span className="status-badge done">Đã xong</span>;
+      return <span className="status-badge done">Done</span>;
     }
 
     if (progress <= 0) {
-      return <span className="status-badge not-started">Chưa bắt đầu</span>;
+      return <span className="status-badge not-started">Not started</span>;
     }
 
-    return <span className="status-badge in-progress">Đang làm {progress}%</span>;
+    return <span className="status-badge in-progress">In progress {progress}%</span>;
   };
 
   const filteredNotes = useMemo(() => {
@@ -425,7 +425,7 @@ const Home = () => {
   // Share
   const openShareModal = async (note) => {
     if (!canManageShares(note)) {
-      toast.info('Chỉ chủ task mới có thể chia sẻ.');
+      toast.info('Only the task owner can share.');
       return;
     }
 
@@ -440,7 +440,7 @@ const Home = () => {
       const res = await getNoteShares(note._id || note.id);
       setShares(res?.shares || []);
     } catch (err) {
-      toast.error(err.message || 'Không thể tải danh sách chia sẻ');
+      toast.error(err.message || 'Failed to load share list');
     } finally {
       setShareLoading(false);
     }
@@ -455,7 +455,7 @@ const Home = () => {
   const handleAddShare = async () => {
     if (!shareTargetNote) return;
     if (!shareEmail.trim()) {
-      toast.error('Nhập email để chia sẻ');
+      toast.error('Enter an email to share with');
       return;
     }
 
@@ -465,12 +465,12 @@ const Home = () => {
         email: shareEmail.trim(),
         permission: sharePermission,
       });
-      toast.success('Đã cập nhật chia sẻ');
+      toast.success('Share updated');
       setShareEmail('');
       await refreshShares();
       fetchData();
     } catch (err) {
-      toast.error(err.message || 'Chia sẻ thất bại');
+      toast.error(err.message || 'Failed to share');
     } finally {
       setShareLoading(false);
     }
@@ -482,9 +482,9 @@ const Home = () => {
       setShareLoading(true);
       await updateNoteShare(shareTargetNote._id || shareTargetNote.id, shareUserId, permission);
       await refreshShares();
-      toast.success('Đã cập nhật quyền');
+      toast.success('Permission updated');
     } catch (err) {
-      toast.error(err.message || 'Lỗi cập nhật quyền');
+      toast.error(err.message || 'Failed to update permission');
     } finally {
       setShareLoading(false);
     }
@@ -492,16 +492,16 @@ const Home = () => {
 
   const handleRemoveShare = async (shareUserId) => {
     if (!shareTargetNote) return;
-    if (!window.confirm('Xóa chia sẻ người dùng này?')) return;
+    if (!window.confirm('Remove this user\'s share?')) return;
 
     try {
       setShareLoading(true);
       await removeNoteShare(shareTargetNote._id || shareTargetNote.id, shareUserId);
       await refreshShares();
-      toast.success('Đã xóa chia sẻ');
+      toast.success('Share removed');
       fetchData();
     } catch (err) {
-      toast.error(err.message || 'Lỗi xóa chia sẻ');
+      toast.error(err.message || 'Failed to remove share');
     } finally {
       setShareLoading(false);
     }
@@ -519,7 +519,7 @@ const Home = () => {
       const res = await getNoteComments(note._id || note.id);
       setComments(res?.comments || []);
     } catch (err) {
-      toast.error(err.message || 'Không thể tải bình luận');
+      toast.error(err.message || 'Failed to load comments');
     } finally {
       setCommentsLoading(false);
     }
@@ -534,7 +534,7 @@ const Home = () => {
   const handleSendComment = async () => {
     if (!commentsTargetNote) return;
     if (!canComment(commentsTargetNote)) {
-      toast.info('Bạn không có quyền bình luận task này.');
+      toast.info('You do not have permission to comment on this task.');
       return;
     }
     if (!commentText.trim()) return;
@@ -544,9 +544,9 @@ const Home = () => {
       await addNoteComment(commentsTargetNote._id || commentsTargetNote.id, commentText.trim());
       setCommentText('');
       await refreshComments();
-      toast.success('Đã gửi bình luận');
+      toast.success('Comment posted');
     } catch (err) {
-      toast.error(err.message || 'Gửi bình luận thất bại');
+      toast.error(err.message || 'Failed to post comment');
     } finally {
       setCommentsLoading(false);
     }
@@ -556,10 +556,10 @@ const Home = () => {
     <div className={`home-container ${theme}-theme`}>
       <div className="home-action-bar">
         <div className="header-top-row">
-          <h2>{viewMode === 'active' ? 'Goal Planner' : 'Thùng rác'}</h2>
+          <h2>{viewMode === 'active' ? 'My Tasks' : 'Trash'}</h2>
           {user && (
             <span className="user-greeting">
-              Xin chào, <strong>{user.username}</strong>
+              Hi, <strong>{user.username}</strong>
             </span>
           )}
         </div>
@@ -569,7 +569,7 @@ const Home = () => {
             <Search size={18} />
             <input
               type="text"
-              placeholder="Tìm kiếm (title / content / category)..."
+              placeholder="Search (title / content / category)…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -579,10 +579,10 @@ const Home = () => {
             <button
               className="btn-admin"
               onClick={() => navigate('/projects')}
-              title="Dự án"
+              title="Projects"
               style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
             >
-              <FolderKanban size={20} /> Dự án
+              <FolderKanban size={20} /> Projects
             </button>
             {user?.role === 'admin' && (
               <button className="btn-admin" onClick={() => navigate('/admin')} title="Admin">
@@ -597,7 +597,7 @@ const Home = () => {
             <button
               className="btn-theme-toggle"
               onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-              title="Đổi giao diện"
+              title="Toggle theme"
             >
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
             </button>
@@ -605,18 +605,18 @@ const Home = () => {
             {viewMode === 'active' ? (
               <>
                 <button className="btn-add" onClick={handleOpenAddModal}>
-                  <Plus size={20} /> <span>Tạo mới</span>
+                  <Plus size={20} /> <span>New</span>
                 </button>
                 <button className="btn-trash-view" onClick={() => setViewMode('trash')}>
-                  <Trash2 size={20} /> Thùng rác
+                  <Trash2 size={20} /> Trash
                 </button>
               </>
             ) : (
               <button className="btn-back" onClick={() => setViewMode('active')}>
-                <Archive size={20} /> Quay lại
+                <Archive size={20} /> Back
               </button>
             )}
-            <button className="btn-logout" onClick={handleLogout} title="Đăng xuất">
+            <button className="btn-logout" onClick={handleLogout} title="Sign out">
               <LogOut size={20} />
             </button>
           </div>
@@ -625,39 +625,39 @@ const Home = () => {
         {viewMode === 'active' && (
           <div className="filters-wrap">
             <div className="filter-row">
-              <span className="filter-label">Phạm vi:</span>
+              <span className="filter-label">Scope:</span>
               <button
                 className={`filter-chip ${scopeFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setScopeFilter('all')}
               >
-                Tất cả
+                All
               </button>
               <button
                 className={`filter-chip ${scopeFilter === 'mine' ? 'active' : ''}`}
                 onClick={() => setScopeFilter('mine')}
               >
-                Của tôi
+                Mine
               </button>
               <button
                 className={`filter-chip ${scopeFilter === 'shared' ? 'active' : ''}`}
                 onClick={() => setScopeFilter('shared')}
               >
-                Được chia sẻ
+                Shared
               </button>
             </div>
 
             <div className="filter-row">
-              <span className="filter-label">Dự án:</span>
+              <span className="filter-label">Project:</span>
               <select
                 className="filter-chip"
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
                 style={{ padding: '6px 10px', borderRadius: 999 }}
               >
-                <option value="all">Tất cả dự án</option>
+                <option value="all">All projects</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}{p.isPersonal ? ' (Cá nhân)' : ''}
+                    {p.name}{p.isPersonal ? ' (Personal)' : ''}
                   </option>
                 ))}
               </select>
@@ -669,31 +669,31 @@ const Home = () => {
                 className={`filter-chip ${dueFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setDueFilter('all')}
               >
-                Tất cả
+                All
               </button>
               <button
                 className={`filter-chip ${dueFilter === 'overdue' ? 'active' : ''}`}
                 onClick={() => setDueFilter('overdue')}
               >
-                Quá hạn
+                Overdue
               </button>
               <button
                 className={`filter-chip ${dueFilter === 'dueSoon' ? 'active' : ''}`}
                 onClick={() => setDueFilter('dueSoon')}
               >
-                Sắp đến hạn
+                Due soon
               </button>
               <button
                 className={`filter-chip ${dueFilter === 'noDeadline' ? 'active' : ''}`}
                 onClick={() => setDueFilter('noDeadline')}
               >
-                Không hạn
+                No deadline
               </button>
               <button
                 className={`filter-chip ${dueFilter === 'done' ? 'active' : ''}`}
                 onClick={() => setDueFilter('done')}
               >
-                Đã xong
+                Done
               </button>
             </div>
           </div>
@@ -723,19 +723,19 @@ const Home = () => {
                     <div className="note-header-left">
                       {getStatusBadge(note)}
                       {shared && (
-                        <span className="shared-badge" title="Task được chia sẻ">
+                        <span className="shared-badge" title="Shared task">
                           Shared
                         </span>
                       )}
-                      {overdue && <span className="due-badge overdue">Quá hạn</span>}
-                      {!overdue && dueSoon && <span className="due-badge soon">Sắp đến hạn</span>}
+                      {overdue && <span className="due-badge overdue">Overdue</span>}
+                      {!overdue && dueSoon && <span className="due-badge soon">Due soon</span>}
                     </div>
 
                     <div className="note-header-right">
                       {note.project?.name ? (
                         <span
                           className="category-badge"
-                          title={`Dự án: ${note.project.name}`}
+                          title={`Project: ${note.project.name}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (note.project?.id) navigate(`/projects/${note.project.id}`);
@@ -763,7 +763,7 @@ const Home = () => {
                     </div>
 
                     <div className={`deadline ${overdue ? 'overdue' : ''} ${!overdue && dueSoon ? 'soon' : ''}`}>
-                      Hạn:{' '}
+                      Due:{' '}
                       {note.deadline
                         ? new Date(note.deadline).toLocaleDateString('vi-VN')
                         : '—'}
@@ -771,7 +771,7 @@ const Home = () => {
 
                     {shared && (
                       <div className="shared-from">
-                        Chia sẻ từ: <strong>{note.owner?.username || note.owner?.email || '—'}</strong>
+                        Shared from: <strong>{note.owner?.username || note.owner?.email || '—'}</strong>
                       </div>
                     )}
                   </div>
@@ -787,7 +787,7 @@ const Home = () => {
                           <button
                             className="action-btn comment"
                             onClick={() => openCommentsModal(note)}
-                            title={canComment(note) ? 'Bình luận' : 'Xem bình luận'}
+                            title={canComment(note) ? 'Comment' : 'View comments'}
                           >
                             <MessageSquare size={18} />
                           </button>
@@ -796,14 +796,14 @@ const Home = () => {
                             <button
                               className="action-btn share"
                               onClick={() => openShareModal(note)}
-                              title="Chia sẻ"
+                              title="Share"
                             >
                               <Share2 size={18} />
                             </button>
                           )}
 
                           {canEdit(note) && (
-                            <button className="action-btn edit" onClick={() => handleEditClick(note)} title="Sửa">
+                            <button className="action-btn edit" onClick={() => handleEditClick(note)} title="Edit">
                               <Edit3 size={18} />
                             </button>
                           )}
@@ -812,7 +812,7 @@ const Home = () => {
                             <button
                               className="action-btn delete"
                               onClick={() => handleDeleteAction(note._id || note.id, note)}
-                              title="Chuyển vào thùng rác"
+                              title="Move to trash"
                             >
                               <Trash2 size={18} />
                             </button>
@@ -823,14 +823,14 @@ const Home = () => {
                           <button
                             className="action-btn restore"
                             onClick={() => handleRestore(note._id || note.id)}
-                            title="Khôi phục"
+                            title="Restore"
                           >
                             <RefreshCcw size={18} />
                           </button>
                           <button
                             className="action-btn delete-forever"
                             onClick={() => handleDeleteAction(note._id || note.id)}
-                            title="Xóa vĩnh viễn"
+                            title="Delete permanently"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -843,7 +843,7 @@ const Home = () => {
             })
           ) : (
             <div className="empty-state">
-              <p>{viewMode === 'active' ? 'Chưa có task nào.' : 'Thùng rác trống.'}</p>
+              <p>{viewMode === 'active' ? 'No tasks yet.' : 'Trash is empty.'}</p>
             </div>
           )}
         </div>
@@ -860,7 +860,7 @@ const Home = () => {
           </button>
 
           <span className="page-info">
-            Trang {currentPage} / {totalPages}
+            Page {currentPage} / {totalPages}
           </span>
 
           <button
@@ -878,18 +878,18 @@ const Home = () => {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3>{isEditing ? 'Sửa Task' : 'Task mới'}</h3>
+              <h3>{isEditing ? 'Edit Task' : 'New Task'}</h3>
               <button className="btn-close" onClick={() => setShowModal(false)}>
                 <X size={24} />
               </button>
             </div>
 
             <div className="form-group">
-              <label>Tiêu đề</label>
+              <label>Title</label>
                 <input
                   type="text"
                   className="custom-input title-input"
-                  placeholder="Tiêu đề..."
+                  placeholder="Title…"
                   value={newNote.title}
                   onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
                   required
@@ -899,7 +899,7 @@ const Home = () => {
             <form onSubmit={handleSaveNote}>
               <div className="form-row">
                 <div className="form-group half">
-                  <label>Danh mục</label>
+                  <label>Category</label>
                   <select
                     className="custom-select"
                     value={newNote.category}
@@ -914,7 +914,7 @@ const Home = () => {
                 </div>
 
                 <div className="form-group half">
-                  <label>Ưu tiên</label>
+                  <label>Priority</label>
                   <input
                     type="number"
                     className="custom-input"
@@ -928,7 +928,7 @@ const Home = () => {
 
               <div className="form-row">
                 <div className="form-group half">
-                  <label>Tiến độ: {newNote.progress}%</label>
+                  <label>Progress: {newNote.progress}%</label>
                   <div className="progress-edit">
                     <input
                       type="range"
@@ -950,7 +950,7 @@ const Home = () => {
                 </div>
 
                 <div className="form-group half">
-                  <label>Trạng thái</label>
+                  <label>Status</label>
                   <select
                     className="custom-select"
                     value={newNote.status === 'cancelled' ? 'cancelled' : 'active'}
@@ -961,23 +961,23 @@ const Home = () => {
                       })
                     }
                   >
-                    <option value="active">Đang làm</option>
-                    <option value="cancelled">Đã hủy</option>
+                    <option value="active">In progress</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Dự án</label>
+                <label>Project</label>
                 <select
                   className="custom-select"
                   value={newNote.project || ''}
                   onChange={(e) => setNewNote({ ...newNote, project: e.target.value })}
                 >
-                  <option value="">— Không thuộc dự án nào —</option>
+                  <option value="">— No project —</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}{p.isPersonal ? ' (Cá nhân)' : ''}
+                      {p.name}{p.isPersonal ? ' (Personal)' : ''}
                     </option>
                   ))}
                 </select>
@@ -994,10 +994,10 @@ const Home = () => {
               </div>
 
               <div className="form-group">
-                <label>Thông tin</label>
+                <label>Content</label>
                 <textarea
                   className="custom-input"
-                  placeholder="Nội dung..."
+                  placeholder="Content…"
                   rows="6"
                   value={newNote.content}
                   onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
@@ -1007,10 +1007,10 @@ const Home = () => {
 
               <div className="modal-footer">
                 <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>
-                  Hủy
+                  Cancel
                 </button>
                 <button type="submit" className="btn-save">
-                  {isEditing ? 'Lưu' : 'Tạo'}
+                  {isEditing ? 'Save' : 'Create'}
                 </button>
               </div>
             </form>
@@ -1023,7 +1023,7 @@ const Home = () => {
         <div className="modal-overlay">
           <div className="modal-content modal-wide">
             <div className="modal-header">
-              <h3>Chia sẻ Task</h3>
+              <h3>Share Task</h3>
               <button className="btn-close" onClick={() => setShowShareModal(false)}>
                 <X size={24} />
               </button>
@@ -1031,7 +1031,7 @@ const Home = () => {
 
             <div className="modal-subtitle">
               <div className="modal-subtitle-title">{shareTargetNote?.title || '—'}</div>
-              <div className="modal-subtitle-hint">Chia sẻ theo email (read / comment / write)</div>
+              <div className="modal-subtitle-hint">Share by email (read / comment / write)</div>
             </div>
 
             <div className="share-form">
@@ -1054,7 +1054,7 @@ const Home = () => {
                 ))}
               </select>
               <button className="btn-save" type="button" onClick={handleAddShare} disabled={shareLoading}>
-                Thêm
+                Add
               </button>
             </div>
 
@@ -1064,7 +1064,7 @@ const Home = () => {
                   <Loader className="animate-spin" />
                 </div>
               ) : shares.length === 0 ? (
-                <div className="muted">Chưa chia sẻ cho ai.</div>
+                <div className="muted">Not shared with anyone yet.</div>
               ) : (
                 shares.map((s) => (
                   <div key={s.user?.id} className="share-item">
@@ -1092,7 +1092,7 @@ const Home = () => {
                         onClick={() => handleRemoveShare(s.user?.id)}
                         disabled={shareLoading}
                       >
-                        Xóa
+                        Remove
                       </button>
                     </div>
                   </div>
@@ -1108,7 +1108,7 @@ const Home = () => {
         <div className="modal-overlay">
           <div className="modal-content modal-wide">
             <div className="modal-header">
-              <h3>Bình luận</h3>
+              <h3>Comments</h3>
               <button className="btn-close" onClick={() => setShowCommentsModal(false)}>
                 <X size={24} />
               </button>
@@ -1117,7 +1117,7 @@ const Home = () => {
             <div className="modal-subtitle">
               <div className="modal-subtitle-title">{commentsTargetNote?.title || '—'}</div>
               <div className="modal-subtitle-hint">
-                {canComment(commentsTargetNote) ? 'Bạn có thể bình luận.' : 'Bạn chỉ có thể xem bình luận.'}
+                {canComment(commentsTargetNote) ? 'You can post comments.' : 'You can only view comments.'}
               </div>
             </div>
 
@@ -1127,7 +1127,7 @@ const Home = () => {
                   <Loader className="animate-spin" />
                 </div>
               ) : comments.length === 0 ? (
-                <div className="muted">Chưa có bình luận.</div>
+                <div className="muted">No comments yet.</div>
               ) : (
                 comments.map((c, idx) => (
                   <div key={c._id || idx} className="comment-item">
@@ -1147,7 +1147,7 @@ const Home = () => {
               <textarea
                 className="custom-input"
                 rows={3}
-                placeholder={canComment(commentsTargetNote) ? 'Viết bình luận...' : 'Bạn không có quyền bình luận.'}
+                placeholder={canComment(commentsTargetNote) ? 'Write a comment…' : 'You do not have permission to comment.'}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 disabled={!canComment(commentsTargetNote) || commentsLoading}
@@ -1158,7 +1158,7 @@ const Home = () => {
                 onClick={handleSendComment}
                 disabled={!canComment(commentsTargetNote) || commentsLoading || !commentText.trim()}
               >
-                Gửi
+                Send
               </button>
             </div>
           </div>

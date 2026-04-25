@@ -1,1 +1,6 @@
 Project Managing/
+# Added by code-review-graph
+.code-review-graph/
+.claude/
+.mcp.json
+CLAUDE.md

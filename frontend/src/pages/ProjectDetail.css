@@ -589,6 +589,7 @@
 
 .task-row:hover {
   border-color: var(--primary-accent);
+  cursor: pointer;
 }
 
 .task-row.done {
@@ -745,4 +746,32 @@
 .modal-form select:focus {
   border-color: var(--primary-accent);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.modal-form input[type='range'] {
+  padding: 0;
+  background: transparent;
+  border: none;
+  accent-color: var(--primary-accent);
+}
+
+.modal-form input[type='range']:focus {
+  box-shadow: none;
+}
+
+.modal-form .modal-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.modal-form .modal-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary-accent);
+  cursor: pointer;
 }

@@ -22,7 +22,7 @@ module.exports = async function authMiddleware(req, res, next) {
     }
 
     if (user.isBanned) {
-      return res.status(403).json({ message: 'Tài khoản đã bị khóa (banned)', code: 'USER_BANNED' });
+      return res.status(403).json({ message: 'Account is banned', code: 'USER_BANNED' });
     }
 
     req.userId = userId;

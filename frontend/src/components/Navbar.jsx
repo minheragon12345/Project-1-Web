@@ -30,22 +30,22 @@ const Navbar = () => {
         <div className="navbar-links">
           <Link to="/" className={`nav-link ${isActive('/') && !isActive('/projects') ? 'active' : ''}`}>
             <StickyNote size={16} />
-            <span>Công việc</span>
+            <span>Tasks</span>
           </Link>
           <Link to="/projects" className={`nav-link ${isActive('/projects') ? 'active' : ''}`}>
             <FolderKanban size={16} />
-            <span>Dự án</span>
+            <span>Projects</span>
           </Link>
         </div>
 
         <div className="navbar-menu">
           <div className="user-info">
             <User size={18} />
-            <span>Chào, <strong>{user?.username || 'Bạn'}</strong></span>
+            <span>Hi, <strong>{user?.username || 'there'}</strong></span>
           </div>
-          <button className="btn-logout-nav" onClick={handleLogout} title="Đăng xuất">
+          <button className="btn-logout-nav" onClick={handleLogout} title="Sign out">
             <LogOut size={20} />
-            <span>Đăng xuất</span>
+            <span>Sign out</span>
           </button>
         </div>
       </div>

@@ -72,6 +72,34 @@
   color: var(--text-primary);
 }
 
+.header-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 240px;
+}
+
+.header-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.link-inline {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary-accent);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.link-inline:hover {
+  color: var(--primary-accent-hover, #4338ca);
+}
+
 .user-greeting {
   font-size: 1rem;
   color: var(--text-secondary);

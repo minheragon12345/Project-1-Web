@@ -42,7 +42,7 @@ router.post('/login', async (req, res) => {
 
     if (user.isBanned) {
       return res.status(403).json({
-        message: user.banReason ? `Tài khoản đã bị khóa: ${user.banReason}` : 'Tài khoản đã bị khóa (banned)',
+        message: user.banReason ? `Account is banned: ${user.banReason}` : 'Account is banned',
         code: 'USER_BANNED',
       });
     }

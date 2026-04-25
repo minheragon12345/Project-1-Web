@@ -1,0 +1,198 @@
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.kanban-column {
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.kanban-column.drop-target {
+  border-color: var(--primary-accent);
+  background-color: rgba(79, 70, 229, 0.08);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18) inset;
+}
+
+.kanban-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.kanban-column-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 0.78rem;
+}
+
+.kanban-column-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+}
+
+.kanban-column-title.col-not_done::before { background: #9ca3af; }
+.kanban-column-title.col-in_progress::before { background: #3b82f6; }
+.kanban-column-title.col-done::before { background: #10b981; }
+.kanban-column-title.col-cancelled::before { background: #ef4444; }
+
+.kanban-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 60px;
+}
+
+.kanban-empty {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  padding: 16px 8px;
+  border: 1px dashed var(--border-secondary);
+  border-radius: 8px;
+}
+
+.kanban-card {
+  position: relative;
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 10px 10px 10px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  user-select: none;
+}
+
+.kanban-card:hover {
+  border-color: var(--primary-accent);
+  box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+.kanban-card.is-dragging {
+  opacity: 0.4;
+}
+
+.kanban-card.is-overlay {
+  cursor: grabbing;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+  transform: rotate(1.5deg);
+  border-color: var(--primary-accent);
+}
+
+.kanban-card.overdue {
+  border-color: var(--danger-text);
+}
+
+.kanban-card-handle {
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  cursor: grab;
+  border-radius: 4px;
+  touch-action: none;
+}
+
+.kanban-card-handle:hover {
+  color: var(--text-primary);
+  background-color: var(--surface-secondary);
+}
+
+.kanban-card-handle:active {
+  cursor: grabbing;
+}
+
+.kanban-card-title {
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+.kanban-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  align-items: center;
+}
+
+.kanban-chip {
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+}
+
+.kanban-card-meta .overdue-text {
+  color: var(--danger-text);
+  font-weight: 600;
+}
+
+.kanban-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.kanban-progress-bar {
+  flex: 1;
+  height: 4px;
+  background-color: var(--surface-secondary);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.kanban-progress-fill {
+  height: 100%;
+  background-color: var(--primary-accent);
+  transition: width 0.2s;
+}
+
+.kanban-progress-text {
+  min-width: 30px;
+  text-align: right;
+}
+
+.kanban-assignee {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}

@@ -11,7 +11,7 @@ export const getNotes = async (search = '', scope = 'all', extra = {}) => {
     const response = await API.get('/notes', { params });
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách task';
+    const message = error.response?.data?.message || 'Could not load tasks';
     throw new Error(message);
   }
 };
@@ -21,7 +21,7 @@ export const createNote = async (noteData) => {
     const response = await API.post('/notes', noteData);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi tạo task';
+    const message = error.response?.data?.message || 'Failed to create task';
     throw new Error(message);
   }
 };
@@ -31,7 +31,7 @@ export const deleteNote = async (id) => {
     const response = await API.delete(`/notes/${id}`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi xóa task';
+    const message = error.response?.data?.message || 'Failed to delete task';
     throw new Error(message);
   }
 };
@@ -41,7 +41,7 @@ export const updateNote = async (id, updatedData) => {
     const response = await API.put(`/notes/${id}`, updatedData);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi cập nhật task';
+    const message = error.response?.data?.message || 'Failed to update task';
     throw new Error(message);
   }
 };
@@ -51,7 +51,7 @@ export const getTrashNotes = async () => {
     const response = await API.get('/notes/trash');
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách thùng rác';
+    const message = error.response?.data?.message || 'Could not load trash';
     throw new Error(message);
   }
 };
@@ -61,7 +61,7 @@ export const restoreNote = async (id) => {
     const response = await API.patch(`/notes/${id}/restore`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi khôi phục task';
+    const message = error.response?.data?.message || 'Failed to restore task';
     throw new Error(message);
   }
 };
@@ -71,7 +71,7 @@ export const deleteNotePermanent = async (id) => {
     const response = await API.delete(`/notes/${id}/hard`);
     return response.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Lỗi khi xóa vĩnh viễn';
+    const message = error.response?.data?.message || 'Failed to delete permanently';
     throw new Error(message);
   }
 };
@@ -82,7 +82,7 @@ export const getNoteShares = async (noteId) => {
     const res = await API.get(`/notes/${noteId}/shares`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể lấy danh sách chia sẻ';
+    const message = error.response?.data?.message || 'Could not load shares';
     throw new Error(message);
   }
 };
@@ -92,7 +92,7 @@ export const shareNote = async (noteId, body) => {
     const res = await API.post(`/notes/${noteId}/share`, body);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể chia sẻ task';
+    const message = error.response?.data?.message || 'Could not share task';
     throw new Error(message);
   }
 };
@@ -102,7 +102,7 @@ export const updateNoteShare = async (noteId, shareUserId, permission) => {
     const res = await API.patch(`/notes/${noteId}/share/${shareUserId}`, { permission });
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể cập nhật quyền chia sẻ';
+    const message = error.response?.data?.message || 'Could not update share permission';
     throw new Error(message);
   }
 };
@@ -112,7 +112,7 @@ export const removeNoteShare = async (noteId, shareUserId) => {
     const res = await API.delete(`/notes/${noteId}/share/${shareUserId}`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể xóa chia sẻ';
+    const message = error.response?.data?.message || 'Could not remove share';
     throw new Error(message);
   }
 };
@@ -123,7 +123,7 @@ export const getNoteComments = async (noteId) => {
     const res = await API.get(`/notes/${noteId}/comments`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể tải bình luận';
+    const message = error.response?.data?.message || 'Could not load comments';
     throw new Error(message);
   }
 };
@@ -133,7 +133,7 @@ export const addNoteComment = async (noteId, text) => {
     const res = await API.post(`/notes/${noteId}/comments`, { text });
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Không thể gửi bình luận';
+    const message = error.response?.data?.message || 'Could not post comment';
     throw new Error(message);
   }
 };

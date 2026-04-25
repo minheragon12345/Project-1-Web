@@ -40,7 +40,7 @@ API.interceptors.response.use(
 
       if (hasToken && !isLoginRequest) {
         try {
-          sessionStorage.setItem('auth_error', data?.message || 'Tài khoản đã bị khóa');
+          sessionStorage.setItem('auth_error', data?.message || 'Account is locked');
         } catch {}
         localStorage.removeItem('token');
         localStorage.removeItem('user');
