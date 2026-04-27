@@ -13,6 +13,7 @@ import {
   Archive,
   Moon,
   Sun,
+  Monitor,
   FolderKanban,
   Plus,
   X,
@@ -29,6 +30,7 @@ import {
 } from '../services/projectService';
 import { getNotes, createNote, updateNote } from '../services/noteService';
 import KanbanBoard from '../components/KanbanBoard';
+import { useTheme } from '../hooks/useTheme';
 import './ProjectDetail.css';
 
 const TASK_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
@@ -50,7 +52,7 @@ const ProjectDetail = () => {
 
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState('light');
+  const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
   const [tab, setTab] = useState('board');
 
   const [saving, setSaving] = useState(false);
@@ -81,6 +83,8 @@ const ProjectDetail = () => {
     progress: 0,
     category: 'Other',
     cancelled: false,
+    assignee: '',
+    estimatedHours: 0,
   });
   const [taskSaving, setTaskSaving] = useState(false);
 
@@ -154,6 +158,21 @@ const ProjectDetail = () => {
 
   const isOwner = project?.role === 'owner';
   const canEdit = project?.role === 'owner' || project?.role === 'editor';
+
+  const assigneeOptions = useMemo(() => {
+    if (!project) return [];
+    const out = [];
+    if (project.owner?.id) {
+      out.push({ id: project.owner.id, label: project.owner.username || project.owner.email || 'Owner', role: 'owner' });
+    }
+    for (const m of project.members || []) {
+      const u = m.user;
+      if (!u?.id) continue;
+      if (project.owner?.id && u.id === project.owner.id) continue;
+      out.push({ id: u.id, label: u.username || u.email || 'Member', role: m.role });
+    }
+    return out;
+  }, [project]);
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -253,6 +272,8 @@ const ProjectDetail = () => {
       progress: 0,
       category: 'Other',
       cancelled: false,
+      assignee: '',
+      estimatedHours: 0,
     });
     setEditingTaskId(null);
   };
@@ -285,6 +306,8 @@ const ProjectDetail = () => {
       progress: typeof task.progress === 'number' ? task.progress : 0,
       category: task.category || 'Other',
       cancelled: task.status === 'cancelled',
+      assignee: task.assignee?.id || task.assignee?._id || task.assignee || '',
+      estimatedHours: typeof task.estimatedHours === 'number' ? task.estimatedHours : 0,
     });
     setShowTaskModal(true);
   };
@@ -307,6 +330,8 @@ const ProjectDetail = () => {
       category: taskForm.category || 'Other',
       progress,
       status,
+      assignee: taskForm.assignee || null,
+      estimatedHours: Math.max(0, Number(taskForm.estimatedHours) || 0),
     };
     setTaskSaving(true);
     try {
@@ -361,7 +386,7 @@ const ProjectDetail = () => {
     resetTaskForm();
   };
 
-  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+  const toggleTheme = cycleTheme;
 
   if (loading || !project) {
     return (
@@ -402,8 +427,14 @@ const ProjectDetail = () => {
         </div>
 
         <div className="action-buttons">
-          <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          <button className="icon-btn" onClick={toggleTheme} title={`Theme: ${themePref}`}>
+            {themePref === 'light' ? (
+              <Sun size={18} />
+            ) : themePref === 'dark' ? (
+              <Moon size={18} />
+            ) : (
+              <Monitor size={18} />
+            )}
           </button>
           {isOwner && !project.isPersonal ? (
             <button className="btn-secondary" onClick={handleArchive}>
@@ -514,6 +545,16 @@ const ProjectDetail = () => {
                           ) : (
                             <span className="muted">No deadline</span>
                           )}
+                          {t.assignee?.username ? (
+                            <span className="assignee-pill" title={t.assignee.email || ''}>
+                              @{t.assignee.username}
+                            </span>
+                          ) : (
+                            <span className="muted">Unassigned</span>
+                          )}
+                          {t.estimatedHours > 0 ? (
+                            <span className="muted">~{t.estimatedHours}h</span>
+                          ) : null}
                           {t.owner?.username ? <span className="muted">• {t.owner.username}</span> : null}
                         </div>
                         <div className="task-progress">
@@ -644,64 +685,154 @@ const ProjectDetail = () => {
       </div>
 
       {showTaskModal ? (
-        <div className="modal-backdrop" onClick={handleCloseTaskModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={handleCloseTaskModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editingTaskId ? 'Edit task' : 'New task'}</h3>
-              <button className="icon-btn" onClick={handleCloseTaskModal} title="Close">
-                <X size={18} />
+              <h3>{editingTaskId ? 'Edit Task' : 'New Task'}</h3>
+              <button className="btn-close" onClick={handleCloseTaskModal} title="Close">
+                <X size={24} />
               </button>
             </div>
-            <form onSubmit={handleSaveTask} className="modal-form">
-              <label>
-                <span>Title</span>
-                <input type="text" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} placeholder="e.g. Write landing page copy" maxLength={120} autoFocus />
-              </label>
-              <label>
-                <span>Content *</span>
-                <textarea rows={4} value={taskForm.content} onChange={(e) => setTaskForm({ ...taskForm, content: e.target.value })} maxLength={5000} placeholder="Task details…" />
-              </label>
+
+            <div className="form-group">
+              <label>Title</label>
+              <input
+                type="text"
+                className="custom-input title-input"
+                placeholder="Title…"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                maxLength={120}
+                autoFocus
+              />
+            </div>
+
+            <form onSubmit={handleSaveTask}>
               <div className="form-row">
-                <label>
-                  <span>Deadline</span>
-                  <input type="date" value={taskForm.deadline} onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })} />
-                </label>
-                <label>
-                  <span>Priority</span>
-                  <input type="number" min="0" max="1024" value={taskForm.priority} onChange={(e) => setTaskForm({ ...taskForm, priority: parseInt(e.target.value || '0', 10) })} />
-                </label>
-                <label>
-                  <span>Category</span>
-                  <select value={taskForm.category} onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}>
-                    {TASK_CATEGORIES.map((c) => (<option key={c} value={c}>{c}</option>))}
+                <div className="form-group half">
+                  <label>Category</label>
+                  <select
+                    className="custom-select"
+                    value={taskForm.category}
+                    onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
+                  >
+                    {TASK_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
-                </label>
+                </div>
+
+                <div className="form-group half">
+                  <label>Priority</label>
+                  <input
+                    type="number"
+                    className="custom-input"
+                    min={0}
+                    max={1024}
+                    value={taskForm.priority}
+                    onChange={(e) => setTaskForm({ ...taskForm, priority: parseInt(e.target.value || '0', 10) })}
+                  />
+                </div>
               </div>
-              <label>
-                <span>Progress: {Math.max(0, Math.min(100, Number(taskForm.progress) || 0))}%</span>
+
+              <div className="form-row">
+                <div className="form-group half">
+                  <label>Progress: {Math.max(0, Math.min(100, Number(taskForm.progress) || 0))}%</label>
+                  <div className="progress-edit">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={taskForm.progress}
+                      disabled={taskForm.cancelled}
+                      onChange={(e) => setTaskForm({ ...taskForm, progress: parseInt(e.target.value || '0', 10) })}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={taskForm.progress}
+                      disabled={taskForm.cancelled}
+                      onChange={(e) => setTaskForm({ ...taskForm, progress: parseInt(e.target.value || '0', 10) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group half">
+                  <label>Status</label>
+                  <select
+                    className="custom-select"
+                    value={taskForm.cancelled ? 'cancelled' : 'active'}
+                    onChange={(e) =>
+                      setTaskForm({ ...taskForm, cancelled: e.target.value === 'cancelled' })
+                    }
+                  >
+                    <option value="active">In progress</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group half">
+                  <label>Assignee</label>
+                  <select
+                    className="custom-select"
+                    value={taskForm.assignee}
+                    onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })}
+                  >
+                    <option value="">— Unassigned —</option>
+                    {assigneeOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}{o.role === 'owner' ? ' (owner)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group half">
+                  <label>Estimated hours</label>
+                  <input
+                    type="number"
+                    className="custom-input"
+                    min={0}
+                    max={10000}
+                    step={0.25}
+                    value={taskForm.estimatedHours}
+                    onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: Number(e.target.value || 0) })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Deadline</label>
                 <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={taskForm.progress}
-                  onChange={(e) => setTaskForm({ ...taskForm, progress: Number(e.target.value) })}
-                  disabled={taskForm.cancelled}
+                  type="date"
+                  className="custom-input"
+                  value={taskForm.deadline}
+                  onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })}
                 />
-              </label>
-              <label className="modal-checkbox">
-                <input
-                  type="checkbox"
-                  checked={taskForm.cancelled}
-                  onChange={(e) => setTaskForm({ ...taskForm, cancelled: e.target.checked })}
+              </div>
+
+              <div className="form-group">
+                <label>Content</label>
+                <textarea
+                  className="custom-input"
+                  placeholder="Content…"
+                  rows="6"
+                  value={taskForm.content}
+                  onChange={(e) => setTaskForm({ ...taskForm, content: e.target.value })}
+                  maxLength={5000}
+                  required
                 />
-                <span>Mark as cancelled</span>
-              </label>
-              <div className="settings-actions">
-                <button type="button" className="btn-secondary" onClick={handleCloseTaskModal} disabled={taskSaving}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={taskSaving}>
-                  {taskSaving ? <Loader size={16} className="spin" /> : editingTaskId ? <Save size={16} /> : <Plus size={16} />}
-                  <span>{taskSaving ? 'Saving…' : editingTaskId ? 'Save' : 'Create task'}</span>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-cancel" onClick={handleCloseTaskModal} disabled={taskSaving}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-save" disabled={taskSaving}>
+                  {taskSaving ? <Loader size={16} className="spin" /> : null}
+                  <span>{taskSaving ? 'Saving…' : editingTaskId ? 'Save' : 'Create'}</span>
                 </button>
               </div>
             </form>

@@ -15,7 +15,7 @@ import {
   getNoteComments,
   addNoteComment,
 } from '../services/noteService';
-import { getProjects } from '../services/projectService';
+import { getProjects, getProject } from '../services/projectService';
 import { toast } from 'react-toastify';
 import {
   Plus,
@@ -30,6 +30,7 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  Monitor,
   Search,
   Shield,
   UserCog,
@@ -37,6 +38,7 @@ import {
   MessageSquare,
   FolderKanban,
 } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 import './Home.css';
 
 const NOTE_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
@@ -111,7 +113,7 @@ function canComment(note) {
 const Home = () => {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState('light');
+  const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('active');
 
@@ -137,9 +139,12 @@ const Home = () => {
     deadline: '',
     priority: 1,
     project: '',
+    assignee: '',
+    estimatedHours: 0,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [currentNoteId, setCurrentNoteId] = useState(null);
+  const [assigneeOptions, setAssigneeOptions] = useState([]);
 
   // Share
   const [showShareModal, setShowShareModal] = useState(false);
@@ -276,6 +281,39 @@ const Home = () => {
     setCurrentPage(1);
   }, [scopeFilter, dueFilter, projectFilter]);
 
+  useEffect(() => {
+    if (!showModal) return;
+    const pid = newNote.project;
+    if (!pid) {
+      setAssigneeOptions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getProject(pid);
+        const p = data?.project;
+        if (cancelled || !p) return;
+        const out = [];
+        if (p.owner?.id) {
+          out.push({ id: p.owner.id, label: p.owner.username || p.owner.email || 'Owner', role: 'owner' });
+        }
+        for (const m of p.members || []) {
+          const u = m.user;
+          if (!u?.id) continue;
+          if (p.owner?.id && u.id === p.owner.id) continue;
+          out.push({ id: u.id, label: u.username || u.email || 'Member', role: m.role });
+        }
+        setAssigneeOptions(out);
+      } catch {
+        if (!cancelled) setAssigneeOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showModal, newNote.project]);
+
   const handleOpenAddModal = () => {
     setNewNote({
       title: '',
@@ -286,6 +324,8 @@ const Home = () => {
       deadline: '',
       priority: 1,
       project: projectFilter && projectFilter !== 'all' ? projectFilter : '',
+      assignee: '',
+      estimatedHours: 0,
     });
     setIsEditing(false);
     setCurrentNoteId(null);
@@ -309,6 +349,8 @@ const Home = () => {
       deadline: toDateInputValue(note.deadline),
       priority: typeof note.priority === 'number' ? note.priority : 1,
       project: note.project?.id || note.project || '',
+      assignee: note.assignee?.id || note.assignee?._id || note.assignee || '',
+      estimatedHours: typeof note.estimatedHours === 'number' ? note.estimatedHours : 0,
     });
 
     setCurrentNoteId(note._id || note.id);
@@ -323,6 +365,8 @@ const Home = () => {
         ...newNote,
         progress: Math.max(0, Math.min(100, Number(newNote.progress) || 0)),
         project: newNote.project || null,
+        assignee: newNote.assignee || null,
+        estimatedHours: Math.max(0, Number(newNote.estimatedHours) || 0),
       };
 
       if (isEditing) {
@@ -575,15 +619,16 @@ const Home = () => {
             />
           </div>
 
+          <button
+            className="btn-admin nav-btn"
+            onClick={() => navigate('/projects')}
+            title="Projects"
+            style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
+          >
+            <FolderKanban size={20} /> Projects
+          </button>
+
           <div className="action-buttons">
-            <button
-              className="btn-admin"
-              onClick={() => navigate('/projects')}
-              title="Projects"
-              style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
-            >
-              <FolderKanban size={20} /> Projects
-            </button>
             {user?.role === 'admin' && (
               <button className="btn-admin" onClick={() => navigate('/admin')} title="Admin">
                 <Shield size={20} /> Admin
@@ -596,10 +641,16 @@ const Home = () => {
             )}
             <button
               className="btn-theme-toggle"
-              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-              title="Toggle theme"
+              onClick={cycleTheme}
+              title={`Theme: ${themePref}`}
             >
-              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+              {themePref === 'light' ? (
+                <Sun size={20} />
+              ) : themePref === 'dark' ? (
+                <Moon size={20} />
+              ) : (
+                <Monitor size={20} />
+              )}
             </button>
 
             {viewMode === 'active' ? (
@@ -768,6 +819,19 @@ const Home = () => {
                         ? new Date(note.deadline).toLocaleDateString('vi-VN')
                         : '—'}
                     </div>
+
+                    {(note.assignee?.username || note.estimatedHours > 0) && (
+                      <div className="note-extras">
+                        {note.assignee?.username ? (
+                          <span className="assignee-pill" title={note.assignee.email || ''}>
+                            @{note.assignee.username}
+                          </span>
+                        ) : null}
+                        {note.estimatedHours > 0 ? (
+                          <span className="estimate-pill">~{note.estimatedHours}h</span>
+                        ) : null}
+                      </div>
+                    )}
 
                     {shared && (
                       <div className="shared-from">
@@ -972,7 +1036,7 @@ const Home = () => {
                 <select
                   className="custom-select"
                   value={newNote.project || ''}
-                  onChange={(e) => setNewNote({ ...newNote, project: e.target.value })}
+                  onChange={(e) => setNewNote({ ...newNote, project: e.target.value, assignee: '' })}
                 >
                   <option value="">— No project —</option>
                   {projects.map((p) => (
@@ -981,6 +1045,39 @@ const Home = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group half">
+                  <label>Assignee</label>
+                  <select
+                    className="custom-select"
+                    value={newNote.assignee}
+                    onChange={(e) => setNewNote({ ...newNote, assignee: e.target.value })}
+                    disabled={!newNote.project}
+                  >
+                    <option value="">
+                      {newNote.project ? '— Unassigned —' : 'Pick a project first'}
+                    </option>
+                    {assigneeOptions.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}{o.role === 'owner' ? ' (owner)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group half">
+                  <label>Estimated hours</label>
+                  <input
+                    type="number"
+                    className="custom-input"
+                    min={0}
+                    max={10000}
+                    step={0.25}
+                    value={newNote.estimatedHours}
+                    onChange={(e) => setNewNote({ ...newNote, estimatedHours: Number(e.target.value || 0) })}
+                  />
+                </div>
               </div>
 
               <div className="form-group">

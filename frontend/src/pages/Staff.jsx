@@ -21,7 +21,11 @@ import {
   RotateCcw,
   Save,
   X,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 import './Staff.css';
 
 const NOTE_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
@@ -41,6 +45,7 @@ function toDateInputValue(dateLike) {
 
 const Staff = () => {
   const navigate = useNavigate();
+  const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
 
   const currentUser = useMemo(() => {
     try {
@@ -233,7 +238,7 @@ const Staff = () => {
   };
 
   return (
-    <div className="staff-container">
+    <div className={`staff-container ${theme}-theme`}>
       <div className="staff-header">
         <div className="staff-title">
           <UserCog size={22} />
@@ -252,6 +257,15 @@ const Staff = () => {
         </div>
 
         <div className="staff-actions">
+          <button className="btn" onClick={cycleTheme} title={`Theme: ${themePref}`}>
+            {themePref === 'light' ? (
+              <Sun size={18} />
+            ) : themePref === 'dark' ? (
+              <Moon size={18} />
+            ) : (
+              <Monitor size={18} />
+            )}
+          </button>
           <button className="btn" onClick={() => navigate('/')}> <ArrowLeft size={18} /> Back to Tasks</button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import {
   Loader,
   Moon,
   Sun,
+  Monitor,
   Archive,
   Trash2,
   FolderKanban,
@@ -20,6 +21,7 @@ import {
   archiveProject,
   deleteProject,
 } from '../services/projectService';
+import { useTheme } from '../hooks/useTheme';
 import './Projects.css';
 
 const SCOPE_OPTIONS = [
@@ -53,7 +55,7 @@ const Projects = () => {
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState('light');
+  const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
 
   const [search, setSearch] = useState('');
   const [scope, setScope] = useState('all');
@@ -153,7 +155,7 @@ const Projects = () => {
     }
   };
 
-  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+  const toggleTheme = cycleTheme;
 
   return (
     <div className={`projects-container ${theme === 'dark' ? 'dark-theme' : ''}`}>
@@ -180,6 +182,15 @@ const Projects = () => {
             />
           </div>
 
+          <button
+            className="btn-admin nav-btn"
+            onClick={() => navigate('/')}
+            title="My Tasks"
+            style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
+          >
+            <Home size={20} /> My Tasks
+          </button>
+
           <div className="filter-group">
             <select value={scope} onChange={(e) => setScope(e.target.value)}>
               {SCOPE_OPTIONS.map((o) => (
@@ -199,12 +210,14 @@ const Projects = () => {
           </div>
 
           <div className="action-buttons">
-            <button className="btn-secondary" onClick={toggleTheme} title="Toggle theme">
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-            <button className="btn-secondary" onClick={() => navigate('/')} title="Home">
-              <Home size={18} />
-              <span>Home</span>
+            <button className="btn-secondary" onClick={toggleTheme} title={`Theme: ${themePref}`}>
+              {themePref === 'light' ? (
+                <Sun size={18} />
+              ) : themePref === 'dark' ? (
+                <Moon size={18} />
+              ) : (
+                <Monitor size={18} />
+              )}
             </button>
             <button className="btn-primary" onClick={handleOpenCreate}>
               <Plus size={18} />

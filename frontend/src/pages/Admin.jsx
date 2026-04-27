@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 import { getUsers, updateUserRole, setUserBan, getAuditLogs } from '../services/adminService';
-import { Shield, ArrowLeft, Users, ClipboardList, Search, RefreshCcw, Ban, CheckCircle2, FileText } from 'lucide-react';
+import { Shield, ArrowLeft, Users, ClipboardList, Search, RefreshCcw, Ban, CheckCircle2, FileText, Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 import './Admin.css';
 
 const Admin = () => {
   const navigate = useNavigate();
+  const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState('users');
 
@@ -107,7 +109,7 @@ const Admin = () => {
   };
 
   return (
-    <div className="admin-container">
+    <div className={`admin-container ${theme}-theme`}>
       <div className="admin-header">
         <div className="admin-title">
           <Shield size={22} />
@@ -118,6 +120,15 @@ const Admin = () => {
         </div>
 
         <div className="admin-actions">
+          <button className="btn" onClick={cycleTheme} title={`Theme: ${themePref}`}>
+            {themePref === 'light' ? (
+              <Sun size={18} />
+            ) : themePref === 'dark' ? (
+              <Moon size={18} />
+            ) : (
+              <Monitor size={18} />
+            )}
+          </button>
           <button className="btn" onClick={() => navigate('/')}>
             <ArrowLeft size={18} /> Back to Tasks
           </button>

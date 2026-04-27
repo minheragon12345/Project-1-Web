@@ -83,6 +83,31 @@ function parseDeadline(value) {
   return d;
 }
 
+function parseEstimatedHours(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return 0;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: 'estimatedHours must be a number' };
+  if (n < 0) return { error: 'estimatedHours must be >= 0' };
+  if (n > 10000) return { error: 'estimatedHours must be <= 10000' };
+  return Math.round(n * 100) / 100;
+}
+
+// Returns { error } | { value: ObjectId|null }
+async function resolveAssignee(value, projectId) {
+  if (value === undefined) return { value: undefined };
+  if (value === null || value === '') return { value: null };
+  if (!isValidObjectId(value)) return { error: 'Invalid assignee id' };
+  if (projectId) {
+    const role = await fetchProjectRole(projectId, value);
+    if (!role) return { error: 'Assignee must be a member of the project.' };
+  } else {
+    const exists = await User.exists({ _id: value });
+    if (!exists) return { error: 'Assignee user not found.' };
+  }
+  return { value };
+}
+
 function derivedStatus(currentStatus, progress) {
   if (currentStatus === 'cancelled') return 'cancelled';
   if (typeof progress === 'number' && progress >= 100) return 'done';
@@ -178,6 +203,19 @@ function toProjectDto(projectOrId) {
   return { id: String(projectOrId) };
 }
 
+function toAssigneeDto(assigneeOrId) {
+  if (!assigneeOrId) return null;
+  if (typeof assigneeOrId === 'string') return { id: assigneeOrId };
+  if (assigneeOrId._id) {
+    return {
+      id: String(assigneeOrId._id),
+      username: assigneeOrId.username,
+      email: assigneeOrId.email,
+    };
+  }
+  return { id: String(assigneeOrId) };
+}
+
 function mapNoteForList(noteLean, reqUserId) {
   const uid = String(reqUserId);
   const ownerId = String(noteLean?.user?._id || noteLean?.user || '');
@@ -197,6 +235,9 @@ function mapNoteForList(noteLean, reqUserId) {
     user: ownerId,
     owner: toOwnerDto(noteLean.user),
     project: toProjectDto(noteLean.project),
+    assignee: toAssigneeDto(noteLean.assignee),
+    estimatedHours: typeof noteLean.estimatedHours === 'number' ? noteLean.estimatedHours : 0,
+    actualHours: typeof noteLean.actualHours === 'number' ? noteLean.actualHours : 0,
     access,
     sharedCount: isOwner ? (noteLean?.sharedWith?.length || 0) : undefined,
     sharedWith: undefined,
@@ -205,7 +246,18 @@ function mapNoteForList(noteLean, reqUserId) {
 }
 
 router.post('/', async (req, res) => {
-  const { title, content, status, priority, progress, category, deadline, project: projectId } = req.body;
+  const {
+    title,
+    content,
+    status,
+    priority,
+    progress,
+    category,
+    deadline,
+    project: projectId,
+    assignee: assigneeId,
+    estimatedHours,
+  } = req.body;
 
   try {
     if (!content || !String(content).trim()) {
@@ -259,6 +311,16 @@ router.post('/', async (req, res) => {
 
     const statusValue = derivedStatus(normalizedStatus, progressValue);
 
+    const parsedHours = parseEstimatedHours(estimatedHours);
+    if (parsedHours && typeof parsedHours === 'object' && parsedHours.error) {
+      return res.status(400).json({ message: parsedHours.error });
+    }
+
+    const assigneeResult = await resolveAssignee(assigneeId, projectRef);
+    if (assigneeResult.error) {
+      return res.status(400).json({ message: assigneeResult.error });
+    }
+
     const newNote = await Note.create({
       user: req.userId,
       project: projectRef,
@@ -269,13 +331,21 @@ router.post('/', async (req, res) => {
       category: normalizedCategory || 'Other',
       deadline: parsedDeadline === undefined ? null : parsedDeadline,
       priority: parsedPriority === undefined ? 0 : parsedPriority,
+      assignee: assigneeResult.value === undefined ? null : assigneeResult.value,
+      estimatedHours: typeof parsedHours === 'number' ? parsedHours : 0,
       sharedWith: [],
       comments: [],
       isDeleted: false,
       deletedAt: null,
     });
 
-    return res.status(201).json({ message: 'Note created', note: newNote });
+    const populated = await Note.findById(newNote._id)
+      .populate('user', 'username email')
+      .populate('project', 'name isPersonal owner members isDeleted')
+      .populate('assignee', 'username email')
+      .lean();
+
+    return res.status(201).json({ message: 'Note created', note: mapNoteForList(populated, req.userId) });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }
@@ -351,6 +421,7 @@ router.get('/', async (req, res) => {
       .select('-comments')
       .populate('user', 'username email')
       .populate('project', 'name isPersonal owner members isDeleted')
+      .populate('assignee', 'username email')
       .sort({ priority: -1, updatedAt: -1 })
       .lean();
 
@@ -386,6 +457,7 @@ router.get('/:id', async (req, res) => {
       .select('-comments')
       .populate('user', 'username email')
       .populate('project', 'name isPersonal owner members isDeleted')
+      .populate('assignee', 'username email')
       .lean();
 
     if (!note) return res.status(404).json({ message: 'Note not found' });
@@ -402,7 +474,18 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { title, content, status, priority, progress, category, deadline, project: projectId } = req.body;
+  const {
+    title,
+    content,
+    status,
+    priority,
+    progress,
+    category,
+    deadline,
+    project: projectId,
+    assignee: assigneeId,
+    estimatedHours,
+  } = req.body;
 
   try {
     if (!isValidObjectId(id)) {
@@ -481,6 +564,23 @@ router.put('/:id', async (req, res) => {
       if (normalizedStatus === 'not_done' && progress === undefined) note.progress = 0;
     }
 
+    if (estimatedHours !== undefined) {
+      const parsedHours = parseEstimatedHours(estimatedHours);
+      if (parsedHours && typeof parsedHours === 'object' && parsedHours.error) {
+        return res.status(400).json({ message: parsedHours.error });
+      }
+      note.estimatedHours = typeof parsedHours === 'number' ? parsedHours : 0;
+    }
+
+    if (assigneeId !== undefined) {
+      const targetProjectId = note.project ? String(note.project._id || note.project) : null;
+      const assigneeResult = await resolveAssignee(assigneeId, targetProjectId);
+      if (assigneeResult.error) {
+        return res.status(400).json({ message: assigneeResult.error });
+      }
+      note.assignee = assigneeResult.value === undefined ? note.assignee : assigneeResult.value;
+    }
+
     if (note.content !== undefined && !String(note.content).trim()) {
       return res.status(400).json({ message: 'content cannot be empty' });
     }
@@ -496,7 +596,14 @@ router.put('/:id', async (req, res) => {
       },
     });
 
-    return res.json({ message: 'Note updated', note });
+    const populated = await Note.findById(note._id)
+      .select('-comments')
+      .populate('user', 'username email')
+      .populate('project', 'name isPersonal owner members isDeleted')
+      .populate('assignee', 'username email')
+      .lean();
+
+    return res.json({ message: 'Note updated', note: mapNoteForList(populated, req.userId) });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }

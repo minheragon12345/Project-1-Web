@@ -108,6 +108,9 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false }) {
             {new Date(task.deadline).toLocaleDateString('vi-VN')}
           </span>
         ) : null}
+        {task.estimatedHours > 0 ? (
+          <span className="kanban-chip">~{task.estimatedHours}h</span>
+        ) : null}
       </div>
 
       {progress > 0 && progress < 100 ? (
@@ -120,7 +123,10 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false }) {
       ) : null}
 
       {task.assignee?.username ? (
-        <div className="kanban-assignee">@{task.assignee.username}</div>
+        <div className="kanban-assignee" title={task.assignee.email || ''}>
+          <span className="assignee-avatar">{(task.assignee.username || '?')[0].toUpperCase()}</span>
+          <span>@{task.assignee.username}</span>
+        </div>
       ) : null}
     </div>
   );
