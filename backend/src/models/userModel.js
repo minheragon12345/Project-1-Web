@@ -48,6 +48,18 @@ const UserSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    billingRate: {
+      type: Number,
+      min: 0,
+      max: 100000,
+      default: 0,
+    },
+    billingCurrency: {
+      type: String,
+      trim: true,
+      maxlength: 8,
+      default: 'USD',
+    },
   },
   { timestamps: true }
 );

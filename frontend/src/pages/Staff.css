@@ -243,7 +243,7 @@
   color: var(--text-tertiary);
 }
 
-/* Staff modal — scoped to avoid colliding with Home/ProjectDetail modal classes */
+/* Staff modal, scoped to avoid colliding with Home/ProjectDetail modal classes */
 .staff-container .modal-overlay {
   position: fixed;
   inset: 0;

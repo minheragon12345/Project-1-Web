@@ -8,6 +8,8 @@ import {
   Moon,
   Sun,
   Monitor,
+  Clock,
+  FileText,
   Archive,
   Trash2,
   FolderKanban,
@@ -189,6 +191,22 @@ const Projects = () => {
             style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
           >
             <Home size={20} /> My Tasks
+          </button>
+
+          <button
+            className="btn-admin nav-btn"
+            onClick={() => navigate('/my-time')}
+            title="My Time"
+          >
+            <Clock size={20} /> My Time
+          </button>
+
+          <button
+            className="btn-admin nav-btn"
+            onClick={() => navigate('/reports')}
+            title="Reports"
+          >
+            <FileText size={20} /> Reports
           </button>
 
           <div className="filter-group">

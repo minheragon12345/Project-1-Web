@@ -22,6 +22,19 @@ export const updateUserRole = async (userId, role) => {
   }
 };
 
+export const setUserBillingRate = async (userId, billingRate, billingCurrency) => {
+  try {
+    const body = {};
+    if (billingRate !== undefined) body.billingRate = billingRate;
+    if (billingCurrency !== undefined) body.billingCurrency = billingCurrency;
+    const response = await API.patch(`/admin/users/${userId}/billing-rate`, body);
+    return response.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not update billing rate';
+    throw new Error(message);
+  }
+};
+
 export const setUserBan = async (userId, isBanned, reason = '') => {
   try {
     const response = await API.patch(`/admin/users/${userId}/ban`, { isBanned, reason });

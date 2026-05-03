@@ -94,6 +94,16 @@ export const updateProjectMemberRole = async (id, memberUserId, role) => {
   }
 };
 
+export const getBudgetSummary = async (id) => {
+  try {
+    const res = await API.get(`/projects/${id}/budget-summary`);
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not load budget summary';
+    throw new Error(message);
+  }
+};
+
 export const removeProjectMember = async (id, memberUserId) => {
   try {
     const res = await API.delete(`/projects/${id}/members/${memberUserId}`);

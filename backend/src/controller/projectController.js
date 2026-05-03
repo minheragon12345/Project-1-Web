@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Project = require('../models/projectModel');
 const User = require('../models/userModel');
+const TimeEntry = require('../models/timeEntryModel');
 const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
 
@@ -520,6 +521,134 @@ router.delete('/:id/members/:memberUserId', async (req, res) => {
     });
 
     return res.json({ message: 'Member removed' });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /:id/budget-summary, planned vs actual cost + hour totals.
+router.get('/:id/budget-summary', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
+
+    const project = await Project.findOne({ _id: id, isDeleted: false })
+      .populate('owner', 'username email billingRate billingCurrency')
+      .populate('members.user', 'username email billingRate billingCurrency')
+      .lean();
+
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canRead(project, req.userId)) return res.status(403).json({ message: 'Forbidden' });
+
+    // Map userId -> billingRate (snapshot of "today's" rate per the plan).
+    const rateMap = new Map();
+    const currencyMap = new Map();
+    if (project.owner) {
+      rateMap.set(String(project.owner._id), Number(project.owner.billingRate) || 0);
+      currencyMap.set(String(project.owner._id), project.owner.billingCurrency || 'USD');
+    }
+    for (const m of project.members || []) {
+      if (m.user?._id) {
+        rateMap.set(String(m.user._id), Number(m.user.billingRate) || 0);
+        currencyMap.set(String(m.user._id), m.user.billingCurrency || 'USD');
+      }
+    }
+
+    // Sum hours per contributing user from non-deleted time entries on this project.
+    const rows = await TimeEntry.aggregate([
+      { $match: { project: new mongoose.Types.ObjectId(String(id)), isDeleted: false } },
+      {
+        $group: {
+          _id: '$user',
+          hours: { $sum: '$hours' },
+          billableHours: { $sum: { $cond: ['$billable', '$hours', 0] } },
+          entries: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // For users not yet in the rate map (e.g., contributors removed from project), look them up.
+    const missingIds = rows
+      .map((r) => String(r._id))
+      .filter((uid) => !rateMap.has(uid));
+    if (missingIds.length > 0) {
+      const extraUsers = await User.find({ _id: { $in: missingIds } })
+        .select('_id username email billingRate billingCurrency')
+        .lean();
+      for (const u of extraUsers) {
+        rateMap.set(String(u._id), Number(u.billingRate) || 0);
+        currencyMap.set(String(u._id), u.billingCurrency || 'USD');
+      }
+    }
+
+    // Resolve usernames for display.
+    const userIds = rows.map((r) => String(r._id));
+    const users = userIds.length > 0
+      ? await User.find({ _id: { $in: userIds } }).select('_id username email billingRate billingCurrency').lean()
+      : [];
+    const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+    let totalHours = 0;
+    let billableHours = 0;
+    let totalCost = 0;
+    let billableCost = 0;
+    const projectCurrency = project.budget?.currency || 'USD';
+
+    const byUser = rows.map((r) => {
+      const uid = String(r._id);
+      const rate = rateMap.get(uid) || 0;
+      const u = userMap.get(uid);
+      const cost = (r.hours || 0) * rate;
+      const billable = (r.billableHours || 0) * rate;
+      totalHours += r.hours || 0;
+      billableHours += r.billableHours || 0;
+      totalCost += cost;
+      billableCost += billable;
+      return {
+        user: u
+          ? { id: uid, username: u.username, email: u.email }
+          : { id: uid },
+        hours: Math.round((r.hours || 0) * 100) / 100,
+        billableHours: Math.round((r.billableHours || 0) * 100) / 100,
+        billingRate: rate,
+        billingCurrency: currencyMap.get(uid) || 'USD',
+        cost: Math.round(cost * 100) / 100,
+        billableCost: Math.round(billable * 100) / 100,
+        entries: r.entries,
+      };
+    });
+
+    byUser.sort((a, b) => b.cost - a.cost);
+
+    const planned = {
+      amount: Number(project.budget?.amount) || 0,
+      currency: projectCurrency,
+      type: project.budget?.type || 'hourly',
+    };
+
+    const actual = {
+      hours: Math.round(totalHours * 100) / 100,
+      billableHours: Math.round(billableHours * 100) / 100,
+      cost: Math.round(totalCost * 100) / 100,
+      billableCost: Math.round(billableCost * 100) / 100,
+    };
+
+    const remaining = planned.amount > 0
+      ? Math.round((planned.amount - actual.cost) * 100) / 100
+      : null;
+    const usedPercent = planned.amount > 0
+      ? Math.round((actual.cost / planned.amount) * 1000) / 10
+      : null;
+
+    return res.json({
+      planned,
+      actual,
+      remaining,
+      usedPercent,
+      byUser,
+      currencyWarning: byUser.some((u) => u.billingCurrency !== projectCurrency),
+    });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }

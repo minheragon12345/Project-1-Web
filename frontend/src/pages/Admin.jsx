@@ -2,10 +2,66 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
-import { getUsers, updateUserRole, setUserBan, getAuditLogs } from '../services/adminService';
+import { getUsers, updateUserRole, setUserBan, setUserBillingRate, getAuditLogs } from '../services/adminService';
 import { Shield, ArrowLeft, Users, ClipboardList, Search, RefreshCcw, Ban, CheckCircle2, FileText, Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import './Admin.css';
+
+function BillingRateCell({ user, onSave }) {
+  const [rate, setRate] = useState(typeof user.billingRate === 'number' ? user.billingRate : 0);
+  const [currency, setCurrency] = useState(user.billingCurrency || 'USD');
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    setRate(typeof user.billingRate === 'number' ? user.billingRate : 0);
+    setCurrency(user.billingCurrency || 'USD');
+  }, [user.billingRate, user.billingCurrency, user._id]);
+
+  if (!editing) {
+    return (
+      <button
+        className="btn"
+        style={{ minWidth: 120 }}
+        title="Edit billing rate"
+        onClick={() => setEditing(true)}
+      >
+        {Number(rate).toFixed(2)} {currency} /h
+      </button>
+    );
+  }
+
+  const submit = async () => {
+    const n = Number(rate);
+    if (!Number.isFinite(n) || n < 0) return;
+    await onSave(user._id, n, currency);
+    setEditing(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input
+        className="select"
+        type="number"
+        min={0}
+        max={100000}
+        step={0.5}
+        value={rate}
+        onChange={(e) => setRate(e.target.value)}
+        style={{ width: 90 }}
+      />
+      <input
+        className="select"
+        type="text"
+        maxLength={8}
+        value={currency}
+        onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+        style={{ width: 64 }}
+      />
+      <button className="btn" onClick={submit} title="Save">Save</button>
+      <button className="btn" onClick={() => setEditing(false)} title="Cancel">×</button>
+    </div>
+  );
+}
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -90,6 +146,16 @@ const Admin = () => {
     }
   };
 
+  const handleBillingChange = async (userId, billingRate, billingCurrency) => {
+    try {
+      await setUserBillingRate(userId, billingRate, billingCurrency);
+      toast.success('Billing rate updated');
+      loadUsers();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update billing rate');
+    }
+  };
+
   const handleBanToggle = async (u) => {
     try {
       if (!u?._id) return;
@@ -170,6 +236,7 @@ const Admin = () => {
                   <tr>
                     <th>User</th>
                     <th>Role</th>
+                    <th>Billing rate</th>
                     <th>Banned</th>
                     <th></th>
                   </tr>
@@ -193,6 +260,9 @@ const Admin = () => {
                         </select>
                       </td>
                       <td>
+                        <BillingRateCell user={u} onSave={handleBillingChange} />
+                      </td>
+                      <td>
                         {u.isBanned ? (
                           <span title={u.banReason || ''}><Ban size={18} /></span>
                         ) : (
@@ -213,7 +283,7 @@ const Admin = () => {
 
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="empty">No users</td>
+                      <td colSpan={5} className="empty">No users</td>
                     </tr>
                   )}
                 </tbody>

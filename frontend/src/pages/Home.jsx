@@ -31,6 +31,8 @@ import {
   Moon,
   Sun,
   Monitor,
+  Clock,
+  FileText,
   Search,
   Shield,
   UserCog,
@@ -39,6 +41,7 @@ import {
   FolderKanban,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import TimeLogSection from '../components/TimeLogSection';
 import './Home.css';
 
 const NOTE_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
@@ -603,7 +606,7 @@ const Home = () => {
           <h2>{viewMode === 'active' ? 'My Tasks' : 'Trash'}</h2>
           {user && (
             <span className="user-greeting">
-              Hi, <strong>{user.username}</strong>
+              <span>Hi, <strong>{user?.username || 'there'}</strong></span>
             </span>
           )}
         </div>
@@ -626,6 +629,22 @@ const Home = () => {
             style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
           >
             <FolderKanban size={20} /> Projects
+          </button>
+
+          <button
+            className="btn-admin nav-btn"
+            onClick={() => navigate('/my-time')}
+            title="My Time"
+          >
+            <Clock size={20} /> My Time
+          </button>
+
+          <button
+            className="btn-admin nav-btn"
+            onClick={() => navigate('/reports')}
+            title="Reports"
+          >
+            <FileText size={20} /> Reports
           </button>
 
           <div className="action-buttons">
@@ -1038,7 +1057,7 @@ const Home = () => {
                   value={newNote.project || ''}
                   onChange={(e) => setNewNote({ ...newNote, project: e.target.value, assignee: '' })}
                 >
-                  <option value="">— No project —</option>
+                  <option value="">— No project,</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}{p.isPersonal ? ' (Personal)' : ''}
@@ -1057,7 +1076,7 @@ const Home = () => {
                     disabled={!newNote.project}
                   >
                     <option value="">
-                      {newNote.project ? '— Unassigned —' : 'Pick a project first'}
+                      {newNote.project ? '— Unassigned,' : 'Pick a project first'}
                     </option>
                     {assigneeOptions.map((o) => (
                       <option key={o.id} value={o.id}>
@@ -1101,6 +1120,15 @@ const Home = () => {
                   required
                 ></textarea>
               </div>
+
+              {isEditing && currentNoteId ? (
+                <TimeLogSection
+                  taskId={currentNoteId}
+                  canWrite={true}
+                  currentUserId={user?.id}
+                  onChange={fetchData}
+                />
+              ) : null}
 
               <div className="modal-footer">
                 <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>

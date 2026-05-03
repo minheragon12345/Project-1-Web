@@ -10,6 +10,8 @@ import Admin from './pages/Admin';
 import Staff from './pages/Staff';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import MyTime from './pages/MyTime';
+import Reports from './pages/Reports';
 import { me } from './services/authService';
 
 function App() {
@@ -75,6 +77,14 @@ function App() {
         <Route
           path="/projects/:id"
           element={isAuthenticated ? <ProjectDetail /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/my-time"
+          element={isAuthenticated ? <MyTime /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/reports"
+          element={isAuthenticated ? <Reports /> : <Navigate to="/login" />}
         />
         <Route
           path="/staff"

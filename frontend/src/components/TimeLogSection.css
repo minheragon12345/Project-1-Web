@@ -1,0 +1,173 @@
+.time-log-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-primary);
+}
+
+.time-log-header h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.time-log-total {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--surface-secondary);
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.time-log-form {
+  display: grid;
+  grid-template-columns: 70px 130px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.time-log-form input[type='number'],
+.time-log-form input[type='date'],
+.time-log-form input[type='text'] {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background-color: var(--surface-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.time-log-form input:focus {
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.time-log-billable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.time-log-billable input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--primary-accent);
+  cursor: pointer;
+}
+
+.time-log-submit {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
+.time-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.time-log-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  padding: 10px;
+  justify-content: center;
+}
+
+.time-log-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background-color: var(--surface-primary);
+  transition: opacity 0.15s;
+}
+
+.time-log-entry.is-pending {
+  opacity: 0.6;
+}
+
+.time-log-entry-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.time-log-entry-hours {
+  font-weight: 700;
+  color: var(--primary-accent);
+  min-width: 50px;
+}
+
+.time-log-entry-date {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.time-log-chip {
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.time-log-chip.billable {
+  background-color: rgba(5, 150, 105, 0.12);
+  color: var(--success-text, #059669);
+}
+
+.time-log-entry-desc {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+  flex: 1;
+}
+
+.time-log-entry-user {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
+.time-log-delete {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .time-log-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .time-log-form .time-log-desc {
+    grid-column: 1 / span 2;
+  }
+  .time-log-form .time-log-submit {
+    grid-column: 1 / span 2;
+  }
+}

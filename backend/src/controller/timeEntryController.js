@@ -1,0 +1,435 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const TimeEntry = require('../models/timeEntryModel');
+const Note = require('../models/noteModel');
+const Project = require('../models/projectModel');
+const auth = require('../middleware/authMiddleware');
+const { writeAudit } = require('../utils/audit');
+
+const router = express.Router();
+router.use(auth);
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
+
+function getProjectAccess(project, userId) {
+  if (!project) return null;
+  if (project.isDeleted) return null;
+  const uid = String(userId || '');
+  if (!uid) return null;
+  const ownerId = String(project.owner?._id || project.owner || '');
+  if (ownerId === uid) return 'owner';
+  const hit = Array.isArray(project.members)
+    ? project.members.find((m) => String(m?.user?._id || m?.user) === uid)
+    : null;
+  return hit?.role || null;
+}
+
+// Returns 'owner' | 'write' | 'comment' | 'read' | null for the requesting user
+// against a populated note (must be populated with project: members + owner).
+function getNoteAccess(note, userId) {
+  const uid = String(userId || '');
+  if (!uid || !note) return null;
+  const ownerId = String(note.user?._id || note.user || '');
+  if (ownerId === uid) return 'owner';
+
+  const shareHit = (note.sharedWith || []).find(
+    (s) => String(s?.user?._id || s?.user) === uid,
+  );
+  if (shareHit?.permission) return shareHit.permission;
+
+  const projAccess = getProjectAccess(note.project, userId);
+  if (projAccess === 'owner' || projAccess === 'editor') return 'write';
+  if (projAccess === 'viewer') return 'read';
+
+  return null;
+}
+
+function canReadNote(note, userId) {
+  return !!getNoteAccess(note, userId);
+}
+
+function canWriteNote(note, userId) {
+  const access = getNoteAccess(note, userId);
+  return access === 'owner' || access === 'write';
+}
+
+function parseHours(value) {
+  if (value === undefined || value === null || value === '') return { error: 'hours is required' };
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: 'hours must be a number' };
+  if (n <= 0) return { error: 'hours must be > 0' };
+  if (n > 24) return { error: 'hours must be <= 24 per entry' };
+  return Math.round(n * 100) / 100;
+}
+
+function parseDate(value) {
+  if (value === undefined || value === null || value === '') {
+    return new Date();
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return { error: 'date must be a valid date' };
+  return d;
+}
+
+function parseBoolean(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true' || value === 1 || value === '1') return true;
+  if (value === 'false' || value === 0 || value === '0') return false;
+  return fallback;
+}
+
+async function recomputeTaskActualHours(taskId) {
+  if (!taskId) return;
+  const agg = await TimeEntry.aggregate([
+    { $match: { task: new mongoose.Types.ObjectId(String(taskId)), isDeleted: false } },
+    { $group: { _id: null, total: { $sum: '$hours' } } },
+  ]);
+  const total = agg[0]?.total || 0;
+  await Note.updateOne({ _id: taskId }, { $set: { actualHours: Math.round(total * 100) / 100 } });
+}
+
+function toEntryDto(entry) {
+  if (!entry) return null;
+  return {
+    id: String(entry._id),
+    user: entry.user
+      ? {
+          id: String(entry.user._id || entry.user),
+          username: entry.user.username,
+          email: entry.user.email,
+        }
+      : null,
+    task: entry.task
+      ? typeof entry.task === 'object' && entry.task._id
+        ? { id: String(entry.task._id), title: entry.task.title, content: entry.task.content }
+        : { id: String(entry.task) }
+      : null,
+    project: entry.project
+      ? typeof entry.project === 'object' && entry.project._id
+        ? { id: String(entry.project._id), name: entry.project.name }
+        : { id: String(entry.project) }
+      : null,
+    hours: entry.hours,
+    date: entry.date,
+    description: entry.description || '',
+    billable: !!entry.billable,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+  };
+}
+
+// POST /, create a time entry on a task the requester can write.
+router.post('/', async (req, res) => {
+  const { task: taskId, hours, date, description, billable } = req.body;
+
+  try {
+    if (!taskId || !isValidObjectId(taskId)) {
+      return res.status(400).json({ message: 'Invalid task id' });
+    }
+
+    const parsedHours = parseHours(hours);
+    if (parsedHours && typeof parsedHours === 'object' && parsedHours.error) {
+      return res.status(400).json({ message: parsedHours.error });
+    }
+
+    const parsedDate = parseDate(date);
+    if (parsedDate && parsedDate.error) {
+      return res.status(400).json({ message: parsedDate.error });
+    }
+
+    const note = await Note.findOne({ _id: taskId, isDeleted: false })
+      .populate('project', 'owner members isDeleted');
+
+    if (!note) return res.status(404).json({ message: 'Task not found' });
+    if (!canWriteNote(note, req.userId)) {
+      return res.status(403).json({ message: 'You do not have permission to log time on this task.' });
+    }
+
+    const entry = await TimeEntry.create({
+      user: req.userId,
+      task: note._id,
+      project: note.project ? note.project._id || note.project : null,
+      hours: parsedHours,
+      date: parsedDate,
+      description: typeof description === 'string' ? description.trim().slice(0, 1000) : '',
+      billable: parseBoolean(billable, true),
+    });
+
+    await recomputeTaskActualHours(note._id);
+
+    await writeAudit(req, {
+      action: 'TIME_ENTRY_CREATE',
+      targetType: 'TIME_ENTRY',
+      targetId: String(entry._id),
+      metadata: { taskId: String(note._id), hours: entry.hours, billable: entry.billable },
+    });
+
+    return res.status(201).json({ message: 'Time entry created', entry: toEntryDto(entry) });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /, list entries the requester can see, filtered by task/user/project/date range.
+router.get('/', async (req, res) => {
+  const { task: taskId, user: userId, project: projectId, from, to, billable, limit } = req.query;
+  const uid = String(req.userId);
+
+  try {
+    const and = [{ isDeleted: false }];
+
+    if (taskId) {
+      if (!isValidObjectId(taskId)) return res.status(400).json({ message: 'Invalid task id' });
+      const note = await Note.findOne({ _id: taskId, isDeleted: false })
+        .populate('project', 'owner members isDeleted');
+      if (!note) return res.status(404).json({ message: 'Task not found' });
+      if (!canReadNote(note, uid)) return res.status(403).json({ message: 'Forbidden' });
+      and.push({ task: taskId });
+    }
+
+    if (projectId) {
+      if (!isValidObjectId(projectId)) return res.status(400).json({ message: 'Invalid project id' });
+      const project = await Project.findOne({ _id: projectId, isDeleted: false })
+        .select('owner members isDeleted')
+        .lean();
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+      const role = getProjectAccess(project, uid);
+      if (!role) return res.status(403).json({ message: 'Forbidden' });
+      and.push({ project: projectId });
+    }
+
+    if (userId) {
+      if (!isValidObjectId(userId)) return res.status(400).json({ message: 'Invalid user id' });
+      and.push({ user: userId });
+    }
+
+    // If no task/project filter, scope to the requester's own entries to avoid leaking data.
+    if (!taskId && !projectId) {
+      and.push({ user: uid });
+    }
+
+    if (from) {
+      const d = new Date(from);
+      if (!Number.isNaN(d.getTime())) and.push({ date: { $gte: d } });
+    }
+    if (to) {
+      const d = new Date(to);
+      if (!Number.isNaN(d.getTime())) and.push({ date: { $lte: d } });
+    }
+
+    if (billable !== undefined) {
+      const b = parseBoolean(billable, null);
+      if (b !== null) and.push({ billable: b });
+    }
+
+    const cap = Math.min(Number(limit) || 200, 1000);
+
+    const entries = await TimeEntry.find({ $and: and })
+      .populate('user', 'username email')
+      .populate('task', 'title content')
+      .populate('project', 'name')
+      .sort({ date: -1, createdAt: -1 })
+      .limit(cap)
+      .lean();
+
+    const totalAgg = await TimeEntry.aggregate([
+      { $match: { $and: and.map((c) => convertObjectIds(c)) } },
+      { $group: { _id: null, totalHours: { $sum: '$hours' } } },
+    ]);
+
+    return res.json({
+      total: entries.length,
+      totalHours: Math.round((totalAgg[0]?.totalHours || 0) * 100) / 100,
+      entries: entries.map(toEntryDto),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Convert string ids in an aggregation $match clause to ObjectIds where appropriate.
+function convertObjectIds(clause) {
+  const out = {};
+  for (const k of Object.keys(clause)) {
+    const v = clause[k];
+    if (k === 'task' || k === 'project' || k === 'user') {
+      if (typeof v === 'string' && isValidObjectId(v)) {
+        out[k] = new mongoose.Types.ObjectId(v);
+        continue;
+      }
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
+// GET /:id, fetch a single entry the requester can read.
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid entry id' });
+
+    const entry = await TimeEntry.findOne({ _id: id, isDeleted: false })
+      .populate('user', 'username email')
+      .populate({
+        path: 'task',
+        select: 'title content user sharedWith project',
+        populate: { path: 'project', select: 'owner members isDeleted' },
+      })
+      .populate('project', 'name owner members isDeleted')
+      .lean();
+
+    if (!entry) return res.status(404).json({ message: 'Time entry not found' });
+
+    const isOwner = String(entry.user?._id || entry.user) === String(req.userId);
+    const canRead = isOwner || (entry.task && canReadNote(entry.task, req.userId));
+    if (!canRead) return res.status(403).json({ message: 'Forbidden' });
+
+    return res.json({ entry: toEntryDto(entry) });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /:id, only the entry owner can edit.
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { hours, date, description, billable } = req.body;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid entry id' });
+
+    const entry = await TimeEntry.findOne({ _id: id, isDeleted: false });
+    if (!entry) return res.status(404).json({ message: 'Time entry not found' });
+
+    if (String(entry.user) !== String(req.userId)) {
+      return res.status(403).json({ message: 'Only the entry owner can edit it.' });
+    }
+
+    let hoursChanged = false;
+
+    if (hours !== undefined) {
+      const parsed = parseHours(hours);
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      hoursChanged = entry.hours !== parsed;
+      entry.hours = parsed;
+    }
+
+    if (date !== undefined) {
+      const parsed = parseDate(date);
+      if (parsed && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      entry.date = parsed;
+    }
+
+    if (description !== undefined) {
+      entry.description = typeof description === 'string' ? description.trim().slice(0, 1000) : '';
+    }
+
+    if (billable !== undefined) {
+      entry.billable = parseBoolean(billable, entry.billable);
+    }
+
+    await entry.save();
+
+    if (hoursChanged) {
+      await recomputeTaskActualHours(entry.task);
+    }
+
+    await writeAudit(req, {
+      action: 'TIME_ENTRY_UPDATE',
+      targetType: 'TIME_ENTRY',
+      targetId: String(entry._id),
+      metadata: { taskId: String(entry.task), hours: entry.hours, billable: entry.billable },
+    });
+
+    return res.json({ message: 'Time entry updated', entry: toEntryDto(entry) });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE /:id, only the entry owner can delete (soft delete).
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid entry id' });
+
+    const entry = await TimeEntry.findOne({ _id: id, isDeleted: false });
+    if (!entry) return res.status(404).json({ message: 'Time entry not found' });
+
+    if (String(entry.user) !== String(req.userId)) {
+      return res.status(403).json({ message: 'Only the entry owner can delete it.' });
+    }
+
+    entry.isDeleted = true;
+    entry.deletedAt = new Date();
+    await entry.save();
+
+    await recomputeTaskActualHours(entry.task);
+
+    await writeAudit(req, {
+      action: 'TIME_ENTRY_DELETE',
+      targetType: 'TIME_ENTRY',
+      targetId: String(entry._id),
+      metadata: { taskId: String(entry.task) },
+    });
+
+    return res.json({ message: 'Time entry deleted' });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /summary/by-task?project=<id>, totals per task, scoped to a project.
+router.get('/summary/by-task', async (req, res) => {
+  const { project: projectId } = req.query;
+  try {
+    if (!projectId || !isValidObjectId(projectId)) {
+      return res.status(400).json({ message: 'project query is required' });
+    }
+
+    const project = await Project.findOne({ _id: projectId, isDeleted: false })
+      .select('owner members isDeleted')
+      .lean();
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!getProjectAccess(project, req.userId)) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const rows = await TimeEntry.aggregate([
+      { $match: { project: new mongoose.Types.ObjectId(String(projectId)), isDeleted: false } },
+      {
+        $group: {
+          _id: '$task',
+          hours: { $sum: '$hours' },
+          billableHours: { $sum: { $cond: ['$billable', '$hours', 0] } },
+          entries: { $sum: 1 },
+        },
+      },
+      { $sort: { hours: -1 } },
+    ]);
+
+    return res.json({
+      total: rows.length,
+      rows: rows.map((r) => ({
+        taskId: String(r._id),
+        hours: Math.round(r.hours * 100) / 100,
+        billableHours: Math.round(r.billableHours * 100) / 100,
+        entries: r.entries,
+      })),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;

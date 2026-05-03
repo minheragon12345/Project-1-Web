@@ -345,6 +345,18 @@ router.post('/', async (req, res) => {
       .populate('assignee', 'username email')
       .lean();
 
+    await writeAudit(req, {
+      action: 'NOTE_CREATE',
+      targetType: 'NOTE',
+      targetId: String(newNote._id),
+      metadata: {
+        projectId: projectRef ? String(projectRef) : null,
+        assigneeId: assigneeResult.value || null,
+        status: statusValue,
+        priority: parsedPriority === undefined ? 0 : parsedPriority,
+      },
+    });
+
     return res.status(201).json({ message: 'Note created', note: mapNoteForList(populated, req.userId) });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
@@ -380,7 +392,7 @@ router.get('/', async (req, res) => {
 
     const and = [{ isDeleted: false }];
     if (projectScopeClause) {
-      // When filtering by project, membership already grants access — no further ownership filter
+      // When filtering by project, membership already grants access, no further ownership filter
       and.push(projectScopeClause);
     } else {
       and.push({ $or: ownershipOr });

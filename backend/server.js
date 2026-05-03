@@ -6,6 +6,7 @@ const authController = require('./src/controller/authController');
 const noteController = require('./src/controller/noteController');
 const adminController = require('./src/controller/adminController');
 const projectController = require('./src/controller/projectController');
+const timeEntryController = require('./src/controller/timeEntryController');
 
 dotenv.config();
 connectDB();
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use('/api/auth', authController);
 app.use('/api/notes', noteController);
 app.use('/api/projects', projectController);
+app.use('/api/time-entries', timeEntryController);
 app.use('/api/admin', adminController);
 
 const PORT = process.env.PORT || 5000;

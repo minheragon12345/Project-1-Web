@@ -141,6 +141,55 @@ router.patch('/users/:id/role', requireRole('admin'), async (req, res) => {
   }
 });
 
+// Billing rate
+router.patch('/users/:id/billing-rate', requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+  const { billingRate, billingCurrency } = req.body;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid user id' });
+
+    const updates = {};
+    if (billingRate !== undefined) {
+      const n = Number(billingRate);
+      if (!Number.isFinite(n)) return res.status(400).json({ message: 'billingRate must be a number' });
+      if (n < 0) return res.status(400).json({ message: 'billingRate must be >= 0' });
+      if (n > 100000) return res.status(400).json({ message: 'billingRate must be <= 100000' });
+      updates.billingRate = Math.round(n * 100) / 100;
+    }
+    if (billingCurrency !== undefined) {
+      const s = String(billingCurrency || '').trim().toUpperCase();
+      if (s.length === 0 || s.length > 8) return res.status(400).json({ message: 'billingCurrency must be 1-8 chars' });
+      updates.billingCurrency = s;
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No changes provided' });
+    }
+
+    const before = await User.findById(id).select('_id billingRate billingCurrency');
+    if (!before) return res.status(404).json({ message: 'User not found' });
+
+    const user = await User.findByIdAndUpdate(id, updates, {
+      new: true,
+      runValidators: true,
+    }).select('-password');
+
+    await writeAudit(req, {
+      action: 'USER_BILLING_UPDATE',
+      targetType: 'User',
+      targetId: id,
+      metadata: {
+        from: { billingRate: before.billingRate, billingCurrency: before.billingCurrency },
+        to: { billingRate: user.billingRate, billingCurrency: user.billingCurrency },
+      },
+    });
+
+    return res.json({ message: 'Billing rate updated', user });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Ban
 router.patch('/users/:id/ban', requireRole('admin'), async (req, res) => {
   const { id } = req.params;

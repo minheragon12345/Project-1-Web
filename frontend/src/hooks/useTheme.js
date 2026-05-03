@@ -28,10 +28,10 @@ function resolve(pref) {
  * storage event and reacts to OS-level changes when on "system".
  *
  * Returns:
- *   pref      — 'light' | 'dark' | 'system' (the user's stored choice)
- *   resolved  — 'light' | 'dark' (effective theme to render)
- *   setPref   — (value) => void
- *   cycle     — light -> dark -> system -> light
+ *   pref     , 'light' | 'dark' | 'system' (the user's stored choice)
+ *   resolved , 'light' | 'dark' (effective theme to render)
+ *   setPref  , (value) => void
+ *   cycle    , light -> dark -> system -> light
  */
 export function useTheme() {
   const [pref, setPrefState] = useState(readPref);

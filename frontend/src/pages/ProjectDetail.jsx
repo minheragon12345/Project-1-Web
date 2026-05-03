@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -17,6 +17,7 @@ import {
   FolderKanban,
   Plus,
   X,
+  BarChart3,
 } from 'lucide-react';
 import {
   getProject,
@@ -27,9 +28,12 @@ import {
   addProjectMember,
   updateProjectMemberRole,
   removeProjectMember,
+  getBudgetSummary,
 } from '../services/projectService';
 import { getNotes, createNote, updateNote } from '../services/noteService';
 import KanbanBoard from '../components/KanbanBoard';
+import TimeLogSection from '../components/TimeLogSection';
+const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 import { useTheme } from '../hooks/useTheme';
 import './ProjectDetail.css';
 
@@ -38,12 +42,13 @@ const TASK_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Othe
 const TABS = [
   { key: 'board', label: 'Board', icon: LayoutGrid },
   { key: 'list', label: 'List', icon: List },
+  { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
 const MEMBER_ROLE_OPTIONS = [
-  { value: 'editor', label: 'Editor — can edit' },
-  { value: 'viewer', label: 'Viewer — read-only' },
+  { value: 'editor', label: 'Editor (edit)' },
+  { value: 'viewer', label: 'Viewer (read-only)' },
 ];
 
 const ProjectDetail = () => {
@@ -70,6 +75,10 @@ const ProjectDetail = () => {
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('editor');
   const [memberSaving, setMemberSaving] = useState(false);
+  const [pendingMemberId, setPendingMemberId] = useState(null);
+  const [leaving, setLeaving] = useState(false);
+  const [budgetSummary, setBudgetSummary] = useState(null);
+  const [budgetLoading, setBudgetLoading] = useState(false);
 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -130,6 +139,19 @@ const ProjectDetail = () => {
     }
   }, [id]);
 
+  const fetchBudgetSummary = useCallback(async () => {
+    setBudgetLoading(true);
+    try {
+      const data = await getBudgetSummary(id);
+      setBudgetSummary(data);
+    } catch (err) {
+      // non-fatal: log only
+      console.warn('budget summary failed:', err.message);
+    } finally {
+      setBudgetLoading(false);
+    }
+  }, [id]);
+
   const fetchTasks = useCallback(async () => {
     setTasksLoading(true);
     try {
@@ -152,12 +174,36 @@ const ProjectDetail = () => {
   }, [fetchProject, navigate]);
 
   useEffect(() => {
-    if (project && tab === 'settings') fetchMembers();
+    if (project && tab === 'settings') {
+      fetchMembers();
+      fetchBudgetSummary();
+    }
     if (project && (tab === 'board' || tab === 'list')) fetchTasks();
-  }, [project, tab, fetchMembers, fetchTasks]);
+  }, [project, tab, fetchMembers, fetchBudgetSummary, fetchTasks]);
 
   const isOwner = project?.role === 'owner';
   const canEdit = project?.role === 'owner' || project?.role === 'editor';
+
+  const roleStats = useMemo(() => {
+    const editors = members.filter((m) => m.role === 'editor').length;
+    const viewers = members.filter((m) => m.role === 'viewer').length;
+    return { editors, viewers, total: 1 + editors + viewers };
+  }, [members]);
+
+  const myMembership = useMemo(() => {
+    const myId = user?.id;
+    if (!myId) return null;
+    return members.find((m) => m.user?.id === myId) || null;
+  }, [members, user]);
+
+  const formatMemberDate = (value) => {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('vi-VN');
+  };
+
+  const initialOf = (name) => (name ? String(name).trim()[0]?.toUpperCase() || '?' : '?');
 
   const assigneeOptions = useMemo(() => {
     if (!project) return [];
@@ -243,23 +289,48 @@ const ProjectDetail = () => {
   };
 
   const handleChangeMemberRole = async (memberUserId, role) => {
+    setPendingMemberId(memberUserId);
     try {
       await updateProjectMemberRole(id, memberUserId, role);
       toast.success('Role updated');
       fetchMembers();
     } catch (err) {
       toast.error(err.message || 'Error');
+    } finally {
+      setPendingMemberId(null);
     }
   };
 
   const handleRemoveMember = async (memberUserId) => {
     if (!window.confirm('Remove this member from the project?')) return;
+    setPendingMemberId(memberUserId);
     try {
       await removeProjectMember(id, memberUserId);
       toast.success('Member removed');
       fetchMembers();
     } catch (err) {
       toast.error(err.message || 'Error');
+    } finally {
+      setPendingMemberId(null);
+    }
+  };
+
+  const handleLeaveProject = async () => {
+    const myId = user?.id;
+    if (!myId) {
+      toast.error('Cannot identify current user.');
+      return;
+    }
+    if (!window.confirm(`Leave project "${project?.name}"? You will lose access to its tasks.`)) return;
+    setLeaving(true);
+    try {
+      await removeProjectMember(id, myId);
+      toast.success('You left the project');
+      navigate('/projects');
+    } catch (err) {
+      toast.error(err.message || 'Failed to leave project');
+    } finally {
+      setLeaving(false);
     }
   };
 
@@ -483,6 +554,10 @@ const ProjectDetail = () => {
               />
             )}
           </div>
+        ) : tab === 'dashboard' ? (
+          <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading dashboard…</span></div>}>
+            <ProjectDashboard projectId={id} currency={form.budgetCurrency || 'USD'} />
+          </Suspense>
         ) : tab === 'list' ? (
           <div className="task-list-panel">
             <div className="task-list-header">
@@ -622,12 +697,128 @@ const ProjectDetail = () => {
               ) : null}
             </form>
 
+            <div className="budget-summary-card">
+              <div className="budget-summary-header">
+                <h3>Budget summary</h3>
+                {budgetLoading ? <Loader size={14} className="spin" /> : null}
+              </div>
+
+              {budgetSummary ? (
+                <>
+                  <div className="budget-stats">
+                    <div className="budget-stat">
+                      <span className="budget-stat-label">Planned</span>
+                      <strong>
+                        {(budgetSummary.planned?.amount || 0).toLocaleString()} {budgetSummary.planned?.currency || 'USD'}
+                      </strong>
+                      <span className="budget-stat-sub">{budgetSummary.planned?.type || 'hourly'}</span>
+                    </div>
+                    <div className="budget-stat">
+                      <span className="budget-stat-label">Actual cost</span>
+                      <strong>
+                        {(budgetSummary.actual?.cost || 0).toLocaleString()} {budgetSummary.planned?.currency || 'USD'}
+                      </strong>
+                      <span className="budget-stat-sub">
+                        {(budgetSummary.actual?.billableCost || 0).toLocaleString()} billable
+                      </span>
+                    </div>
+                    <div className="budget-stat">
+                      <span className="budget-stat-label">Hours logged</span>
+                      <strong>{(budgetSummary.actual?.hours || 0).toFixed(2)}h</strong>
+                      <span className="budget-stat-sub">
+                        {(budgetSummary.actual?.billableHours || 0).toFixed(2)}h billable
+                      </span>
+                    </div>
+                    <div className="budget-stat">
+                      <span className="budget-stat-label">Remaining</span>
+                      <strong className={budgetSummary.remaining !== null && budgetSummary.remaining < 0 ? 'budget-over' : ''}>
+                        {budgetSummary.remaining === null
+                          ? '—'
+                          : `${budgetSummary.remaining.toLocaleString()} ${budgetSummary.planned?.currency || 'USD'}`}
+                      </strong>
+                      <span className="budget-stat-sub">
+                        {budgetSummary.usedPercent === null ? 'no budget set' : `${budgetSummary.usedPercent}% used`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {budgetSummary.usedPercent !== null ? (
+                    <div className="budget-progress">
+                      <div
+                        className={`budget-progress-fill ${budgetSummary.usedPercent > 100 ? 'over' : ''}`}
+                        style={{ width: `${Math.min(100, Math.max(0, budgetSummary.usedPercent))}%` }}
+                      />
+                    </div>
+                  ) : null}
+
+                  {budgetSummary.currencyWarning ? (
+                    <div className="budget-warning">
+                      Some contributors have a different billing currency. Costs assume the project currency.
+                    </div>
+                  ) : null}
+
+                  {budgetSummary.byUser?.length ? (
+                    <div className="budget-by-user">
+                      <h4>Cost by user</h4>
+                      <table className="budget-user-table">
+                        <thead>
+                          <tr>
+                            <th>User</th>
+                            <th>Hours</th>
+                            <th>Rate</th>
+                            <th>Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {budgetSummary.byUser.map((row) => (
+                            <tr key={row.user?.id}>
+                              <td>
+                                <strong>{row.user?.username || row.user?.email || '—'}</strong>
+                              </td>
+                              <td>
+                                {row.hours.toFixed(2)}h
+                                <span className="muted-inline"> ({row.billableHours.toFixed(2)} billable)</span>
+                              </td>
+                              <td>
+                                {row.billingRate.toFixed(2)} {row.billingCurrency}/h
+                              </td>
+                              <td>
+                                <strong>{row.cost.toLocaleString()} {budgetSummary.planned?.currency || 'USD'}</strong>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="budget-empty">No time logged on this project yet.</div>
+                  )}
+                </>
+              ) : (
+                <div className="budget-empty">
+                  {budgetLoading ? 'Loading…' : 'No data yet.'}
+                </div>
+              )}
+            </div>
+
             <div className="members-section">
-              <h3>Members ({members.length})</h3>
+              <div className="members-header">
+                <h3>Members ({roleStats.total})</h3>
+                <div className="members-stats">
+                  <span className="role-stat role-owner">1 owner</span>
+                  <span className="role-stat role-editor">{roleStats.editors} editor{roleStats.editors === 1 ? '' : 's'}</span>
+                  <span className="role-stat role-viewer">{roleStats.viewers} viewer{roleStats.viewers === 1 ? '' : 's'}</span>
+                </div>
+              </div>
 
               {isOwner ? (
                 <form className="member-add-form" onSubmit={handleAddMember}>
-                  <input type="email" placeholder="Member email" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} />
+                  <input
+                    type="email"
+                    placeholder="member@example.com"
+                    value={memberEmail}
+                    onChange={(e) => setMemberEmail(e.target.value)}
+                  />
                   <select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
                     {MEMBER_ROLE_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                   </select>
@@ -640,34 +831,77 @@ const ProjectDetail = () => {
 
               <div className="members-list">
                 <div className="member-row owner-row">
+                  <span className="member-avatar role-owner-avatar" aria-hidden>
+                    {initialOf(project.owner?.username || project.owner?.email)}
+                  </span>
                   <div className="member-info">
                     <strong>{project.owner?.username || '—'}</strong>
-                    <span className="member-email">{project.owner?.email}</span>
+                    <span className="member-email">{project.owner?.email || ''}</span>
                   </div>
+                  <span className="member-meta">Project creator</span>
                   <span className="project-role role-owner">owner</span>
                 </div>
-                {members.map((m) => (
-                  <div className="member-row" key={m.user?.id}>
-                    <div className="member-info">
-                      <strong>{m.user?.username || '—'}</strong>
-                      <span className="member-email">{m.user?.email}</span>
-                    </div>
-                    {isOwner ? (
-                      <div className="member-actions">
-                        <select value={m.role} onChange={(e) => handleChangeMemberRole(m.user.id, e.target.value)}>
-                          {MEMBER_ROLE_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                        </select>
-                        <button className="icon-btn danger" title="Remove member" onClick={() => handleRemoveMember(m.user.id)}>
-                          <Trash2 size={16} />
-                        </button>
+
+                {members.map((m) => {
+                  const memberId = m.user?.id;
+                  const isMe = memberId && user?.id === memberId;
+                  const pending = pendingMemberId === memberId;
+                  return (
+                    <div className={`member-row ${pending ? 'is-pending' : ''}`} key={memberId}>
+                      <span className={`member-avatar role-${m.role}-avatar`} aria-hidden>
+                        {initialOf(m.user?.username || m.user?.email)}
+                      </span>
+                      <div className="member-info">
+                        <strong>
+                          {m.user?.username || '—'}
+                          {isMe ? <span className="me-tag">you</span> : null}
+                        </strong>
+                        <span className="member-email">{m.user?.email || ''}</span>
                       </div>
-                    ) : (
-                      <span className={`project-role role-${m.role}`}>{m.role}</span>
-                    )}
-                  </div>
-                ))}
-                {members.length === 0 ? (<div className="member-empty">No members yet besides the project owner.</div>) : null}
+                      <span className="member-meta">Added {formatMemberDate(m.addedAt)}</span>
+                      {isOwner ? (
+                        <div className="member-actions">
+                          <select
+                            value={m.role}
+                            onChange={(e) => handleChangeMemberRole(memberId, e.target.value)}
+                            disabled={pending}
+                          >
+                            {MEMBER_ROLE_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                          </select>
+                          <button
+                            className="icon-btn danger"
+                            title="Remove member"
+                            onClick={() => handleRemoveMember(memberId)}
+                            disabled={pending}
+                          >
+                            {pending ? <Loader size={14} className="spin" /> : <Trash2 size={16} />}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={`project-role role-${m.role}`}>{m.role}</span>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {members.length === 0 ? (
+                  <div className="member-empty">No members yet besides the project owner.</div>
+                ) : null}
               </div>
+
+              {!isOwner && myMembership && !project.isPersonal ? (
+                <div className="leave-row">
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    onClick={handleLeaveProject}
+                    disabled={leaving}
+                  >
+                    {leaving ? <Loader size={16} className="spin" /> : <Trash2 size={16} />}
+                    <span>{leaving ? 'Leaving…' : 'Leave project'}</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {isOwner && !project.isPersonal ? (
@@ -781,7 +1015,7 @@ const ProjectDetail = () => {
                     value={taskForm.assignee}
                     onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })}
                   >
-                    <option value="">— Unassigned —</option>
+                    <option value="">— Unassigned,</option>
                     {assigneeOptions.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.label}{o.role === 'owner' ? ' (owner)' : ''}
@@ -825,6 +1059,15 @@ const ProjectDetail = () => {
                   required
                 />
               </div>
+
+              {editingTaskId ? (
+                <TimeLogSection
+                  taskId={editingTaskId}
+                  canWrite={canEdit}
+                  currentUserId={user?.id}
+                  onChange={fetchTasks}
+                />
+              ) : null}
 
               <div className="modal-footer">
                 <button type="button" className="btn-cancel" onClick={handleCloseTaskModal} disabled={taskSaving}>
