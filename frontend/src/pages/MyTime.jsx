@@ -12,6 +12,7 @@ import {
   Sun,
   Trash2,
   CalendarDays,
+  LogOut,
 } from 'lucide-react';
 import { listTimeEntries, deleteTimeEntry } from '../services/timeEntryService';
 import { useTheme } from '../hooks/useTheme';
@@ -162,6 +163,18 @@ const MyTime = () => {
             onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
           >
             <ArrowLeft size={18} /> Back
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.dispatchEvent(new Event('authChange'));
+              navigate('/login');
+            }}
+            title="Sign out"
+          >
+            <LogOut size={18} /> Logout
           </button>
         </div>
       </div>

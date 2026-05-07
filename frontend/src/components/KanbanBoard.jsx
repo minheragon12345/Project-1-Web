@@ -10,7 +10,7 @@ import {
   useDroppable,
   closestCorners,
 } from '@dnd-kit/core';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Lock, GitBranch } from 'lucide-react';
 import './KanbanBoard.css';
 
 const BOARD_COLUMNS = [
@@ -103,6 +103,16 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false }) {
       <div className="kanban-card-meta">
         <span className="priority-chip">P{task.priority || 0}</span>
         {task.category ? <span className="kanban-chip">{task.category}</span> : null}
+        {task.isBlocked ? (
+          <span className="kanban-chip blocked" title="Blocked by dependencies">
+            <Lock size={10} /> Blocked
+          </span>
+        ) : null}
+        {task.subtaskStats?.total > 0 ? (
+          <span className="kanban-chip subtask" title="Subtasks done / total">
+            <GitBranch size={10} /> {task.subtaskStats.done}/{task.subtaskStats.total}
+          </span>
+        ) : null}
         {task.deadline ? (
           <span className={overdue ? 'overdue-text' : ''}>
             {new Date(task.deadline).toLocaleDateString('vi-VN')}
@@ -122,10 +132,16 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false }) {
         </div>
       ) : null}
 
-      {task.assignee?.username ? (
-        <div className="kanban-assignee" title={task.assignee.email || ''}>
-          <span className="assignee-avatar">{(task.assignee.username || '?')[0].toUpperCase()}</span>
-          <span>@{task.assignee.username}</span>
+      {Array.isArray(task.assignees) && task.assignees.length > 0 ? (
+        <div className="kanban-assignees">
+          {task.assignees.slice(0, 3).map((a) => (
+            <span className="assignee-avatar" key={a.id} title={`@${a.username || ''}`}>
+              {(a.username || '?')[0].toUpperCase()}
+            </span>
+          ))}
+          {task.assignees.length > 3 ? (
+            <span className="assignee-avatar more">+{task.assignees.length - 3}</span>
+          ) : null}
         </div>
       ) : null}
     </div>

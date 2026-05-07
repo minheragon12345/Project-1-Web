@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const PROJECT_STATUSES = ['active', 'archived'];
-const MEMBER_ROLES = ['owner', 'editor', 'viewer'];
+const MEMBER_ROLES = ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
+const ASSIGNABLE_MEMBER_ROLES = ['moderator', 'editor', 'reviewer', 'viewer'];
 const BUDGET_TYPES = ['fixed', 'hourly'];
 
 const ProjectSchema = new mongoose.Schema(
@@ -86,4 +87,5 @@ const Project = mongoose.model('Project', ProjectSchema);
 module.exports = Project;
 module.exports.PROJECT_STATUSES = PROJECT_STATUSES;
 module.exports.MEMBER_ROLES = MEMBER_ROLES;
+module.exports.ASSIGNABLE_MEMBER_ROLES = ASSIGNABLE_MEMBER_ROLES;
 module.exports.BUDGET_TYPES = BUDGET_TYPES;

@@ -58,7 +58,8 @@ export default function TimeLogSection({ taskId, canWrite, currentUserId, onChan
   }, [fetchEntries]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
     if (!taskId) return;
     const hours = Number(form.hours);
     if (!Number.isFinite(hours) || hours <= 0) {
@@ -114,7 +115,7 @@ export default function TimeLogSection({ taskId, canWrite, currentUserId, onChan
       </div>
 
       {canWrite ? (
-        <form className="time-log-form" onSubmit={handleSubmit}>
+        <div className="time-log-form">
           <input
             type="number"
             min="0.25"
@@ -148,11 +149,16 @@ export default function TimeLogSection({ taskId, canWrite, currentUserId, onChan
             />
             <span>Billable</span>
           </label>
-          <button type="submit" className="btn-save time-log-submit" disabled={saving}>
+          <button
+            type="button"
+            className="btn-save time-log-submit"
+            disabled={saving}
+            onClick={handleSubmit}
+          >
             {saving ? <Loader size={14} className="spin" /> : <Plus size={14} />}
             <span>{saving ? 'Logging…' : 'Log time'}</span>
           </button>
-        </form>
+        </div>
       ) : null}
 
       <div className="time-log-list">

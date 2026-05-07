@@ -113,3 +113,13 @@ export const removeProjectMember = async (id, memberUserId) => {
     throw new Error(message);
   }
 };
+
+export const getProjectAuditLog = async (id, { limit = 200 } = {}) => {
+  try {
+    const res = await API.get(`/projects/${id}/audit-log`, { params: { limit } });
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not load audit log';
+    throw new Error(message);
+  }
+};

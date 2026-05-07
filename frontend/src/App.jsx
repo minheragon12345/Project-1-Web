@@ -5,9 +5,6 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Home from './pages/Home';
-import Admin from './pages/Admin';
-import Staff from './pages/Staff';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import MyTime from './pages/MyTime';
@@ -57,9 +54,6 @@ function App() {
     })();
   }, [user]);
 
-  const isAdmin = user?.role === 'admin';
-  const isStaff = user?.role === 'admin' || user?.role === 'moderator';
-
   return (
     <Router>
       <ToastContainer position="top-right" autoClose={3000} />
@@ -68,7 +62,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route
           path="/"
-          element={isAuthenticated ? <Home /> : <Navigate to="/login" />}
+          element={isAuthenticated ? <Navigate to="/projects" replace /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/projects"
@@ -86,14 +80,7 @@ function App() {
           path="/reports"
           element={isAuthenticated ? <Reports /> : <Navigate to="/login" />}
         />
-        <Route
-          path="/staff"
-          element={isAuthenticated && isStaff ? <Staff /> : <Navigate to="/" />}
-        />
-        <Route
-          path="/admin"
-          element={isAuthenticated && isAdmin ? <Admin /> : <Navigate to="/" />}
-        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

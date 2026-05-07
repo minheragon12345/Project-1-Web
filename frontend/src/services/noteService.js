@@ -46,9 +46,12 @@ export const updateNote = async (id, updatedData) => {
   }
 };
 
-export const getTrashNotes = async () => {
+export const getTrashNotes = async ({ projectId, search } = {}) => {
   try {
-    const response = await API.get('/notes/trash');
+    const params = {};
+    if (projectId) params.projectId = projectId;
+    if (search) params.search = search;
+    const response = await API.get('/notes/trash', { params });
     return response.data;
   } catch (error) {
     const message = error.response?.data?.message || 'Could not load trash';
@@ -76,43 +79,74 @@ export const deleteNotePermanent = async (id) => {
   }
 };
 
-// Share
-export const getNoteShares = async (noteId) => {
+// Subtasks
+export const getSubtasks = async (parentId) => {
   try {
-    const res = await API.get(`/notes/${noteId}/shares`);
+    const res = await API.get(`/notes/${parentId}/subtasks`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Could not load shares';
+    const message = error.response?.data?.message || 'Could not load subtasks';
     throw new Error(message);
   }
 };
 
-export const shareNote = async (noteId, body) => {
+export const createSubtask = async (parentId, fields) => {
   try {
-    const res = await API.post(`/notes/${noteId}/share`, body);
+    const res = await API.post('/notes', { ...fields, parentTask: parentId });
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Could not share task';
+    const message = error.response?.data?.message || 'Could not create subtask';
     throw new Error(message);
   }
 };
 
-export const updateNoteShare = async (noteId, shareUserId, permission) => {
+// Dependencies
+export const getBlockedBy = async (noteId) => {
   try {
-    const res = await API.patch(`/notes/${noteId}/share/${shareUserId}`, { permission });
+    const res = await API.get(`/notes/${noteId}/dependencies/blocked-by`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Could not update share permission';
+    const message = error.response?.data?.message || 'Could not load dependencies';
     throw new Error(message);
   }
 };
 
-export const removeNoteShare = async (noteId, shareUserId) => {
+export const getBlocks = async (noteId) => {
   try {
-    const res = await API.delete(`/notes/${noteId}/share/${shareUserId}`);
+    const res = await API.get(`/notes/${noteId}/dependencies/blocks`);
     return res.data;
   } catch (error) {
-    const message = error.response?.data?.message || 'Could not remove share';
+    const message = error.response?.data?.message || 'Could not load dependent tasks';
+    throw new Error(message);
+  }
+};
+
+export const setDependencies = async (noteId, dependencies) => {
+  try {
+    const res = await API.put(`/notes/${noteId}/dependencies`, { dependencies });
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not set dependencies';
+    throw new Error(message);
+  }
+};
+
+export const addDependency = async (noteId, depId) => {
+  try {
+    const res = await API.post(`/notes/${noteId}/dependencies/${depId}`);
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not add dependency';
+    throw new Error(message);
+  }
+};
+
+export const removeDependency = async (noteId, depId) => {
+  try {
+    const res = await API.delete(`/notes/${noteId}/dependencies/${depId}`);
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not remove dependency';
     throw new Error(message);
   }
 };

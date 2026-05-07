@@ -157,6 +157,32 @@
   padding: 1px 6px;
   border-radius: 999px;
   font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.kanban-chip.blocked {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-weight: 600;
+}
+
+.kanban-chip.subtask {
+  background-color: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.dark-theme .kanban-chip.blocked {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+}
+
+.dark-theme .kanban-chip.subtask {
+  background-color: rgba(67, 56, 202, 0.2);
+  color: #c7d2fe;
 }
 
 .kanban-card-meta .overdue-text {
@@ -191,24 +217,35 @@
   text-align: right;
 }
 
-.kanban-assignee {
+.kanban-assignees {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .assignee-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
   background-color: rgba(79, 70, 229, 0.18);
   color: var(--primary-accent);
   font-weight: 700;
   font-size: 0.7rem;
   text-transform: uppercase;
+  border: 2px solid var(--surface-primary);
+  margin-left: -4px;
+}
+
+.assignee-avatar:first-child {
+  margin-left: 0;
+}
+
+.assignee-avatar.more {
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  font-size: 0.65rem;
 }

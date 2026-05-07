@@ -1,13 +1,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Project = require('../models/projectModel');
+const Note = require('../models/noteModel');
 const User = require('../models/userModel');
 const TimeEntry = require('../models/timeEntryModel');
+const AuditLog = require('../models/auditLogModel');
 const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
 
 const router = express.Router();
-const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'editor', 'viewer'];
+const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
+const ASSIGNABLE_MEMBER_ROLES = Project.ASSIGNABLE_MEMBER_ROLES || ['moderator', 'editor', 'reviewer', 'viewer'];
 const PROJECT_STATUSES = Project.PROJECT_STATUSES || ['active', 'archived'];
 const BUDGET_TYPES = Project.BUDGET_TYPES || ['fixed', 'hourly'];
 
@@ -39,11 +42,37 @@ function canRead(project, userId) {
 
 function canWrite(project, userId) {
   const role = getMemberRole(project, userId);
-  return role === 'owner' || role === 'editor';
+  return role === 'owner' || role === 'moderator' || role === 'editor';
+}
+
+function canManageProject(project, userId) {
+  const role = getMemberRole(project, userId);
+  return role === 'owner' || role === 'moderator';
+}
+
+function canViewLog(project, userId) {
+  const role = getMemberRole(project, userId);
+  return role === 'owner' || role === 'moderator';
 }
 
 function canManageMembers(project, userId) {
-  return getMemberRole(project, userId) === 'owner';
+  const role = getMemberRole(project, userId);
+  return role === 'owner' || role === 'moderator';
+}
+
+function isSubordinateRole(role) {
+  return role === 'editor' || role === 'reviewer' || role === 'viewer';
+}
+
+function canManageMemberAt(project, requesterId, currentRole, newRole) {
+  const role = getMemberRole(project, requesterId);
+  if (role === 'owner') return true;
+  if (role === 'moderator') {
+    if (currentRole !== undefined && currentRole !== null && !isSubordinateRole(currentRole)) return false;
+    if (newRole !== undefined && newRole !== null && !isSubordinateRole(newRole)) return false;
+    return true;
+  }
+  return false;
 }
 
 function parseDate(value) {
@@ -252,8 +281,8 @@ router.put('/:id', async (req, res) => {
     const project = await Project.findOne({ _id: id, isDeleted: false });
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
-    if (!canWrite(project, req.userId)) {
-      return res.status(403).json({ message: 'You do not have permission to edit this project.' });
+    if (!canManageProject(project, req.userId)) {
+      return res.status(403).json({ message: 'Only the project owner or moderators can edit this project.' });
     }
 
     if (name !== undefined) {
@@ -310,7 +339,7 @@ router.patch('/:id/archive', async (req, res) => {
     const project = await Project.findOne({ _id: id, isDeleted: false });
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
-    if (!canManageMembers(project, req.userId)) {
+    if (ownerIdOf(project) !== String(req.userId)) {
       return res.status(403).json({ message: 'Only the project owner can archive it.' });
     }
 
@@ -402,8 +431,8 @@ router.post('/:id/members', async (req, res) => {
     if (!email || !String(email).trim()) return res.status(400).json({ message: 'email is required' });
 
     const r = String(role || 'viewer').trim().toLowerCase();
-    if (!MEMBER_ROLES.includes(r) || r === 'owner') {
-      return res.status(400).json({ message: `Invalid role. Allowed: editor, viewer` });
+    if (!ASSIGNABLE_MEMBER_ROLES.includes(r)) {
+      return res.status(400).json({ message: `Invalid role. Allowed: ${ASSIGNABLE_MEMBER_ROLES.join(', ')}` });
     }
 
     const project = await Project.findOne({ _id: id, isDeleted: false });
@@ -411,6 +440,9 @@ router.post('/:id/members', async (req, res) => {
 
     if (!canManageMembers(project, req.userId)) {
       return res.status(403).json({ message: 'You do not have permission to add members.' });
+    }
+    if (!canManageMemberAt(project, req.userId, undefined, r)) {
+      return res.status(403).json({ message: 'Moderators can only assign editor, reviewer or viewer roles.' });
     }
 
     const targetEmail = String(email).trim().toLowerCase();
@@ -426,6 +458,9 @@ router.post('/:id/members', async (req, res) => {
     let action = 'PROJECT_MEMBER_ADD';
 
     if (existing) {
+      if (!canManageMemberAt(project, req.userId, existing.role, r)) {
+        return res.status(403).json({ message: 'Moderators cannot change moderator/owner roles.' });
+      }
       existing.role = r;
       action = 'PROJECT_MEMBER_UPDATE';
     } else {
@@ -461,8 +496,8 @@ router.patch('/:id/members/:memberUserId', async (req, res) => {
     if (!isValidObjectId(memberUserId)) return res.status(400).json({ message: 'Invalid user id' });
 
     const r = String(role || 'viewer').trim().toLowerCase();
-    if (!MEMBER_ROLES.includes(r) || r === 'owner') {
-      return res.status(400).json({ message: `Invalid role. Allowed: editor, viewer` });
+    if (!ASSIGNABLE_MEMBER_ROLES.includes(r)) {
+      return res.status(400).json({ message: `Invalid role. Allowed: ${ASSIGNABLE_MEMBER_ROLES.join(', ')}` });
     }
 
     const project = await Project.findOne({ _id: id, isDeleted: false });
@@ -474,6 +509,10 @@ router.patch('/:id/members/:memberUserId', async (req, res) => {
 
     const entry = (project.members || []).find((m) => String(m.user) === String(memberUserId));
     if (!entry) return res.status(404).json({ message: 'Member not found' });
+
+    if (!canManageMemberAt(project, req.userId, entry.role, r)) {
+      return res.status(403).json({ message: 'Moderators cannot promote/demote moderator-or-above ranks.' });
+    }
 
     entry.role = r;
     await project.save();
@@ -501,8 +540,15 @@ router.delete('/:id/members/:memberUserId', async (req, res) => {
     const project = await Project.findOne({ _id: id, isDeleted: false });
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
-    if (!canManageMembers(project, req.userId) && String(memberUserId) !== String(req.userId)) {
-      return res.status(403).json({ message: 'You do not have permission to remove members.' });
+    const isSelf = String(memberUserId) === String(req.userId);
+    if (!isSelf) {
+      if (!canManageMembers(project, req.userId)) {
+        return res.status(403).json({ message: 'You do not have permission to remove members.' });
+      }
+      const target = (project.members || []).find((m) => String(m.user) === String(memberUserId));
+      if (!canManageMemberAt(project, req.userId, target?.role, undefined)) {
+        return res.status(403).json({ message: 'Moderators cannot remove moderator-or-above members.' });
+      }
     }
 
     const before = project.members?.length || 0;
@@ -649,6 +695,51 @@ router.get('/:id/budget-summary', async (req, res) => {
       byUser,
       currencyWarning: byUser.some((u) => u.billingCurrency !== projectCurrency),
     });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/:id/audit-log', async (req, res) => {
+  const { id } = req.params;
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
+
+    const project = await Project.findOne({ _id: id, isDeleted: false }).lean();
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canViewLog(project, req.userId)) {
+      return res.status(403).json({ message: 'Only the project owner or moderators can view the log.' });
+    }
+
+    const noteIds = await Note.find({ project: id }).distinct('_id');
+    const noteIdStrings = noteIds.map(String);
+
+    const logs = await AuditLog.find({
+      $or: [
+        { targetType: 'PROJECT', targetId: String(id) },
+        { targetType: 'NOTE', targetId: { $in: noteIdStrings } },
+      ],
+    })
+      .populate('actor', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const items = logs.map((l) => ({
+      id: String(l._id),
+      action: l.action,
+      targetType: l.targetType,
+      targetId: l.targetId ? String(l.targetId) : null,
+      actor: l.actor
+        ? { id: String(l.actor._id || l.actor), username: l.actor.username, email: l.actor.email }
+        : null,
+      actorRole: l.actorRole,
+      metadata: l.metadata || {},
+      createdAt: l.createdAt,
+    }));
+
+    return res.json({ total: items.length, items });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }

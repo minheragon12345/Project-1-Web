@@ -15,7 +15,7 @@ import {
   FolderKanban,
   Users,
   X,
-  Home,
+  LogOut,
 } from 'lucide-react';
 import {
   getProjects,
@@ -186,15 +186,6 @@ const Projects = () => {
 
           <button
             className="btn-admin nav-btn"
-            onClick={() => navigate('/')}
-            title="My Tasks"
-            style={{ backgroundColor: '#eef2ff', color: '#4f46e5' }}
-          >
-            <Home size={20} /> My Tasks
-          </button>
-
-          <button
-            className="btn-admin nav-btn"
             onClick={() => navigate('/my-time')}
             title="My Time"
           >
@@ -240,6 +231,19 @@ const Projects = () => {
             <button className="btn-primary" onClick={handleOpenCreate}>
               <Plus size={18} />
               <span>New project</span>
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.dispatchEvent(new Event('authChange'));
+                navigate('/login');
+              }}
+              title="Sign out"
+            >
+              <LogOut size={18} />
+              <span>Logout</span>
             </button>
           </div>
         </div>

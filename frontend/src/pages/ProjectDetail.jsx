@@ -18,6 +18,13 @@ import {
   Plus,
   X,
   BarChart3,
+  Lock,
+  GitBranch,
+  ScrollText,
+  MessageSquare,
+  Search,
+  RefreshCcw,
+  LogOut,
 } from 'lucide-react';
 import {
   getProject,
@@ -29,27 +36,44 @@ import {
   updateProjectMemberRole,
   removeProjectMember,
   getBudgetSummary,
+  getProjectAuditLog,
 } from '../services/projectService';
-import { getNotes, createNote, updateNote } from '../services/noteService';
+import {
+  getNotes,
+  createNote,
+  updateNote,
+  deleteNote,
+  getTrashNotes,
+  restoreNote,
+  deleteNotePermanent,
+  getNoteComments,
+  addNoteComment,
+} from '../services/noteService';
 import KanbanBoard from '../components/KanbanBoard';
 import TimeLogSection from '../components/TimeLogSection';
+import TaskRelationsSection from '../components/TaskRelationsSection';
 const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 import { useTheme } from '../hooks/useTheme';
 import './ProjectDetail.css';
 
 const TASK_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
 
-const TABS = [
+const TABS_BASE = [
   { key: 'board', label: 'Board', icon: LayoutGrid },
   { key: 'list', label: 'List', icon: List },
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
+const LOG_TAB = { key: 'log', label: 'Log', icon: ScrollText };
+
 const MEMBER_ROLE_OPTIONS = [
+  { value: 'moderator', label: 'Moderator (edit + view log)' },
   { value: 'editor', label: 'Editor (edit)' },
+  { value: 'reviewer', label: 'Reviewer (comment only)' },
   { value: 'viewer', label: 'Viewer (read-only)' },
 ];
+
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -82,8 +106,16 @@ const ProjectDetail = () => {
 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [listSearch, setListSearch] = useState('');
+  const [listTrashView, setListTrashView] = useState(false);
+  const [trashTasks, setTrashTasks] = useState([]);
+  const [trashLoading, setTrashLoading] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editingTaskRef, setEditingTaskRef] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editingTaskParent, setEditingTaskParent] = useState(null);
+  const [editingSubtaskStats, setEditingSubtaskStats] = useState({ total: 0, done: 0 });
   const [taskForm, setTaskForm] = useState({
     title: '',
     content: '',
@@ -92,10 +124,17 @@ const ProjectDetail = () => {
     progress: 0,
     category: 'Other',
     cancelled: false,
-    assignee: '',
+    assignees: [],
     estimatedHours: 0,
   });
   const [taskSaving, setTaskSaving] = useState(false);
+
+  const [logItems, setLogItems] = useState([]);
+  const [logLoading, setLogLoading] = useState(false);
+
+  const [commentList, setCommentList] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentsLoading, setCommentsLoading] = useState(false);
 
   const user = useMemo(() => {
     try {
@@ -152,6 +191,51 @@ const ProjectDetail = () => {
     }
   }, [id]);
 
+  const fetchLog = useCallback(async () => {
+    setLogLoading(true);
+    try {
+      const data = await getProjectAuditLog(id, { limit: 200 });
+      setLogItems(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load log');
+    } finally {
+      setLogLoading(false);
+    }
+  }, [id]);
+
+  const fetchTrash = useCallback(async () => {
+    setTrashLoading(true);
+    try {
+      const data = await getTrashNotes({ projectId: id });
+      setTrashTasks(Array.isArray(data?.notes) ? data.notes : []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load trash');
+    } finally {
+      setTrashLoading(false);
+    }
+  }, [id]);
+
+  const handleRestoreTask = async (task) => {
+    try {
+      await restoreNote(task._id || task.id);
+      toast.success('Restored');
+      fetchTrash();
+    } catch (err) {
+      toast.error(err.message || 'Failed to restore');
+    }
+  };
+
+  const handleHardDeleteTask = async (task) => {
+    if (!window.confirm('Permanently delete this task? Cannot be undone.')) return;
+    try {
+      await deleteNotePermanent(task._id || task.id);
+      toast.success('Permanently deleted');
+      fetchTrash();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete');
+    }
+  };
+
   const fetchTasks = useCallback(async () => {
     setTasksLoading(true);
     try {
@@ -173,16 +257,22 @@ const ProjectDetail = () => {
     fetchProject();
   }, [fetchProject, navigate]);
 
+  const isOwner = project?.role === 'owner';
+  const canEdit = project?.role === 'owner' || project?.role === 'moderator' || project?.role === 'editor';
+  const canManageProject = project?.role === 'owner' || project?.role === 'moderator';
+  const canViewLog = project?.role === 'owner' || project?.role === 'moderator';
+  const canComment = project?.role === 'owner' || project?.role === 'moderator' || project?.role === 'editor' || project?.role === 'reviewer';
+  const TABS = canViewLog ? [...TABS_BASE.slice(0, 3), LOG_TAB, TABS_BASE[3]] : TABS_BASE;
+
   useEffect(() => {
     if (project && tab === 'settings') {
       fetchMembers();
       fetchBudgetSummary();
     }
     if (project && (tab === 'board' || tab === 'list')) fetchTasks();
-  }, [project, tab, fetchMembers, fetchBudgetSummary, fetchTasks]);
-
-  const isOwner = project?.role === 'owner';
-  const canEdit = project?.role === 'owner' || project?.role === 'editor';
+    if (project && tab === 'list' && listTrashView) fetchTrash();
+    if (project && tab === 'log' && canViewLog) fetchLog();
+  }, [project, tab, listTrashView, fetchMembers, fetchBudgetSummary, fetchTasks, fetchTrash, fetchLog, canViewLog]);
 
   const roleStats = useMemo(() => {
     const editors = members.filter((m) => m.role === 'editor').length;
@@ -343,14 +433,21 @@ const ProjectDetail = () => {
       progress: 0,
       category: 'Other',
       cancelled: false,
-      assignee: '',
+      assignees: [],
       estimatedHours: 0,
     });
+    setCommentList([]);
+    setCommentText('');
     setEditingTaskId(null);
+    setEditingTaskRef(null);
+    setEditingTaskParent(null);
+    setEditingSubtaskStats({ total: 0, done: 0 });
+    setEditMode(false);
   };
 
   const handleOpenCreateTask = () => {
     resetTaskForm();
+    setEditMode(true);
     setShowTaskModal(true);
   };
 
@@ -363,12 +460,11 @@ const ProjectDetail = () => {
 
   const handleOpenEditTask = (task) => {
     if (!task) return;
-    const editorAccess = task.access === 'owner' || task.access === 'write';
-    if (!canEdit && !editorAccess) {
-      toast.info('You only have read access to this task.');
-      return;
-    }
     setEditingTaskId(task._id || task.id);
+    setEditingTaskRef(task);
+    setEditingTaskParent(task.parentTask || null);
+    setEditingSubtaskStats(task.subtaskStats || { total: 0, done: 0 });
+    setEditMode(false);
     setTaskForm({
       title: task.title || '',
       content: task.content || '',
@@ -377,9 +473,12 @@ const ProjectDetail = () => {
       progress: typeof task.progress === 'number' ? task.progress : 0,
       category: task.category || 'Other',
       cancelled: task.status === 'cancelled',
-      assignee: task.assignee?.id || task.assignee?._id || task.assignee || '',
+      assignees: Array.isArray(task.assignees)
+        ? task.assignees.map((a) => String(a?.id || a?._id || a)).filter(Boolean)
+        : [],
       estimatedHours: typeof task.estimatedHours === 'number' ? task.estimatedHours : 0,
     });
+    fetchTaskComments(task._id || task.id);
     setShowTaskModal(true);
   };
 
@@ -390,8 +489,8 @@ const ProjectDetail = () => {
       toast.error('Content cannot be empty');
       return;
     }
+    const isAutoProgress = (editingSubtaskStats?.total || 0) > 0;
     const progress = Math.max(0, Math.min(100, Number(taskForm.progress) || 0));
-    const status = taskForm.cancelled ? 'cancelled' : progress >= 100 ? 'done' : 'not_done';
     const payload = {
       title: taskForm.title.trim(),
       content,
@@ -399,23 +498,33 @@ const ProjectDetail = () => {
       priority: Number(taskForm.priority) || 0,
       deadline: taskForm.deadline || null,
       category: taskForm.category || 'Other',
-      progress,
-      status,
-      assignee: taskForm.assignee || null,
+      assignees: Array.isArray(taskForm.assignees) ? taskForm.assignees : [],
       estimatedHours: Math.max(0, Number(taskForm.estimatedHours) || 0),
     };
+    if (isAutoProgress) {
+      if (taskForm.cancelled) payload.status = 'cancelled';
+    } else {
+      payload.progress = progress;
+      payload.status = taskForm.cancelled ? 'cancelled' : progress >= 100 ? 'done' : 'not_done';
+    }
     setTaskSaving(true);
     try {
       if (editingTaskId) {
-        await updateNote(editingTaskId, payload);
+        const resp = await updateNote(editingTaskId, payload);
         toast.success('Task saved');
+        await fetchTasks();
+        if (resp?.note) {
+          handleOpenEditTask(resp.note);
+        } else {
+          setEditMode(false);
+        }
       } else {
         await createNote(payload);
         toast.success('Task created');
+        setShowTaskModal(false);
+        resetTaskForm();
+        await fetchTasks();
       }
-      setShowTaskModal(false);
-      resetTaskForm();
-      fetchTasks();
     } catch (err) {
       toast.error(err.message || 'Failed to save task');
     } finally {
@@ -425,6 +534,16 @@ const ProjectDetail = () => {
 
   const handleToggleTaskDone = async (task) => {
     const newStatus = task.status === 'done' ? 'not_done' : 'done';
+    if (newStatus === 'done' && task.isBlocked) {
+      const blockerCount = (task.dependencies || []).length;
+      if (!window.confirm(`This task has ${blockerCount} unfinished blocker${blockerCount === 1 ? '' : 's'}. Mark done anyway?`)) {
+        return;
+      }
+    }
+    if ((task.subtaskStats?.total || 0) > 0) {
+      toast.info('A parent task\'s status follows its subtasks. Update the subtasks instead.');
+      return;
+    }
     try {
       await updateNote(task._id || task.id, {
         status: newStatus,
@@ -438,6 +557,16 @@ const ProjectDetail = () => {
 
   const handleTaskMove = async (task, patch) => {
     const tid = task._id || task.id;
+    if (patch.status === 'done' && task.isBlocked) {
+      const blockerCount = (task.dependencies || []).length;
+      if (!window.confirm(`This task has ${blockerCount} unfinished blocker${blockerCount === 1 ? '' : 's'}. Mark done anyway?`)) {
+        return;
+      }
+    }
+    if ((task.subtaskStats?.total || 0) > 0 && (patch.status === 'done' || patch.status === 'not_done')) {
+      toast.info('A parent task\'s status follows its subtasks. Move the subtasks instead.');
+      return;
+    }
     const previous = tasks;
     setTasks((prev) =>
       prev.map((t) => ((t._id || t.id) === tid ? { ...t, ...patch } : t)),
@@ -448,6 +577,50 @@ const ProjectDetail = () => {
     } catch (err) {
       setTasks(previous);
       toast.error(err.message || 'Could not move task');
+    }
+  };
+
+  const handleDeleteTask = async (task) => {
+    if (task.access !== 'owner') {
+      toast.info('Only the task owner can move it to trash.');
+      return;
+    }
+    if (!window.confirm('Move this task to trash?')) return;
+    try {
+      await deleteNote(task._id || task.id);
+      toast.success('Moved to trash');
+      fetchTasks();
+    } catch (err) {
+      toast.error(err.message || 'Could not delete');
+    }
+  };
+
+  const fetchTaskComments = useCallback(async (taskId) => {
+    if (!taskId) return;
+    try {
+      setCommentsLoading(true);
+      const res = await getNoteComments(taskId);
+      setCommentList(res?.comments || []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load comments');
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, []);
+
+  const handleSendComment = async () => {
+    if (!editingTaskId || !canComment) return;
+    if (!commentText.trim()) return;
+    try {
+      setCommentsLoading(true);
+      await addNoteComment(editingTaskId, commentText.trim());
+      setCommentText('');
+      await fetchTaskComments(editingTaskId);
+      toast.success('Comment posted');
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    } finally {
+      setCommentsLoading(false);
     }
   };
 
@@ -513,6 +686,19 @@ const ProjectDetail = () => {
               <span>{project.status === 'archived' ? 'Restore' : 'Archive'}</span>
             </button>
           ) : null}
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.dispatchEvent(new Event('authChange'));
+              navigate('/login');
+            }}
+            title="Sign out"
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
@@ -559,26 +745,66 @@ const ProjectDetail = () => {
             <ProjectDashboard projectId={id} currency={form.budgetCurrency || 'USD'} />
           </Suspense>
         ) : tab === 'list' ? (
+          (() => {
+            const sourceTasks = listTrashView ? trashTasks : tasks;
+            const q = listSearch.trim().toLowerCase();
+            const visibleTasks = q
+              ? sourceTasks.filter((t) =>
+                  (t.title || '').toLowerCase().includes(q) ||
+                  (t.content || '').toLowerCase().includes(q) ||
+                  (t.category || '').toLowerCase().includes(q),
+                )
+              : sourceTasks;
+            const isLoading = listTrashView ? trashLoading : tasksLoading;
+            return (
           <div className="task-list-panel">
             <div className="task-list-header">
-              <h3>Tasks in this project ({tasks.length})</h3>
-              {canEdit ? (
-                <button className="btn-primary" onClick={handleOpenCreateTask}>
-                  <Plus size={16} />
-                  <span>New task</span>
+              <h3>
+                {listTrashView ? 'Trash' : 'Tasks in this project'} ({visibleTasks.length})
+              </h3>
+              <div className="task-list-actions">
+                <div className="task-list-search">
+                  <Search size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search title / content / category…"
+                    value={listSearch}
+                    onChange={(e) => setListSearch(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={`btn-secondary ${listTrashView ? 'active' : ''}`}
+                  onClick={() => setListTrashView((v) => !v)}
+                  title="Toggle trash view"
+                >
+                  {listTrashView ? <List size={14} /> : <Trash2 size={14} />}
+                  <span>{listTrashView ? 'Active' : 'Trash'}</span>
                 </button>
-              ) : null}
+                {canEdit && !listTrashView ? (
+                  <button className="btn-primary" onClick={handleOpenCreateTask}>
+                    <Plus size={16} />
+                    <span>New task</span>
+                  </button>
+                ) : null}
+              </div>
             </div>
-            {tasksLoading ? (
+            {isLoading ? (
               <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading…</span></div>
-            ) : tasks.length === 0 ? (
+            ) : visibleTasks.length === 0 ? (
               <div className="tab-placeholder">
-                <List size={40} />
-                <p>No tasks yet. Create the first task to get started.</p>
+                {listTrashView ? <Trash2 size={40} /> : <List size={40} />}
+                <p>
+                  {listTrashView
+                    ? 'Trash is empty for this project.'
+                    : q
+                      ? 'No tasks match your search.'
+                      : 'No tasks yet. Create the first task to get started.'}
+                </p>
               </div>
             ) : (
               <div className="task-list">
-                {tasks.map((t) => {
+                {visibleTasks.map((t) => {
                   const tid = t._id || t.id;
                   const progress = typeof t.progress === 'number' ? t.progress : 0;
                   const overdue =
@@ -589,13 +815,13 @@ const ProjectDetail = () => {
                     progress < 100;
                   return (
                     <div
-                      className={`task-row ${t.status} ${overdue ? 'overdue' : ''}`}
+                      className={`task-row ${t.status} ${overdue ? 'overdue' : ''} ${listTrashView ? 'is-trashed' : ''}`}
                       key={tid}
-                      onClick={() => handleOpenEditTask(t)}
-                      role="button"
-                      tabIndex={0}
+                      onClick={() => !listTrashView && handleOpenEditTask(t)}
+                      role={listTrashView ? undefined : 'button'}
+                      tabIndex={listTrashView ? -1 : 0}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleOpenEditTask(t);
+                        if (!listTrashView && e.key === 'Enter') handleOpenEditTask(t);
                       }}
                     >
                       <input
@@ -603,7 +829,7 @@ const ProjectDetail = () => {
                         checked={t.status === 'done'}
                         onChange={() => handleToggleTaskDone(t)}
                         onClick={(e) => e.stopPropagation()}
-                        disabled={!canEdit && t.access !== 'owner' && t.access !== 'write'}
+                        disabled={listTrashView || (!canEdit && t.access !== 'owner' && t.access !== 'write')}
                         aria-label="Mark as done"
                       />
                       <div className="task-main">
@@ -613,6 +839,16 @@ const ProjectDetail = () => {
                         <div className="task-sub">
                           <span className="priority-chip">P{t.priority || 0}</span>
                           <span>{t.category || 'Other'}</span>
+                          {t.isBlocked ? (
+                            <span className="blocked-chip" title="Blocked by dependencies">
+                              <Lock size={10} /> Blocked
+                            </span>
+                          ) : null}
+                          {t.subtaskStats?.total > 0 ? (
+                            <span className="subtask-mini" title="Subtasks done / total">
+                              <GitBranch size={10} /> {t.subtaskStats.done}/{t.subtaskStats.total}
+                            </span>
+                          ) : null}
                           {t.deadline ? (
                             <span className={overdue ? 'overdue-text' : ''}>
                               Due: {new Date(t.deadline).toLocaleDateString('vi-VN')}
@@ -620,9 +856,16 @@ const ProjectDetail = () => {
                           ) : (
                             <span className="muted">No deadline</span>
                           )}
-                          {t.assignee?.username ? (
-                            <span className="assignee-pill" title={t.assignee.email || ''}>
-                              @{t.assignee.username}
+                          {Array.isArray(t.assignees) && t.assignees.length > 0 ? (
+                            <span className="assignees-row">
+                              {t.assignees.slice(0, 3).map((a) => (
+                                <span className="assignee-pill" key={a.id} title={a.email || ''}>
+                                  @{a.username}
+                                </span>
+                              ))}
+                              {t.assignees.length > 3 ? (
+                                <span className="assignee-pill more">+{t.assignees.length - 3}</span>
+                              ) : null}
                             </span>
                           ) : (
                             <span className="muted">Unassigned</span>
@@ -639,9 +882,85 @@ const ProjectDetail = () => {
                           <span className="task-progress-text">{progress}%</span>
                         </div>
                       </div>
+                      <div className="task-actions" onClick={(e) => e.stopPropagation()}>
+                        {listTrashView ? (
+                          <>
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              title="Restore"
+                              onClick={() => handleRestoreTask(t)}
+                            >
+                              <RefreshCcw size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn danger"
+                              title="Delete permanently"
+                              onClick={() => handleHardDeleteTask(t)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              title="Open"
+                              onClick={() => handleOpenEditTask(t)}
+                            >
+                              <MessageSquare size={16} />
+                            </button>
+                            {t.access === 'owner' ? (
+                              <button
+                                type="button"
+                                className="icon-btn danger"
+                                title="Move to trash"
+                                onClick={() => handleDeleteTask(t)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+            );
+          })()
+        ) : tab === 'log' ? (
+          <div className="audit-log-panel">
+            <div className="audit-log-header">
+              <h3>Activity log {logItems.length ? `(${logItems.length})` : ''}</h3>
+              {logLoading ? <Loader size={14} className="spin" /> : null}
+            </div>
+            {!canViewLog ? (
+              <div className="tab-placeholder"><p>You do not have access to this log.</p></div>
+            ) : logLoading && logItems.length === 0 ? (
+              <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading…</span></div>
+            ) : logItems.length === 0 ? (
+              <div className="tab-placeholder"><ScrollText size={36} /><p>No activity yet.</p></div>
+            ) : (
+              <div className="audit-log-list">
+                {logItems.map((l) => (
+                  <div className="audit-log-row" key={l.id}>
+                    <span className="audit-log-time">
+                      {l.createdAt ? new Date(l.createdAt).toLocaleString('vi-VN') : '—'}
+                    </span>
+                    <span className="audit-log-actor">
+                      {l.actor?.username || l.actor?.email || 'unknown'}
+                    </span>
+                    <span className="audit-log-action">{l.action}</span>
+                    <span className="audit-log-target">
+                      {l.targetType}{l.targetId ? `:${String(l.targetId).slice(-6)}` : ''}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -651,43 +970,43 @@ const ProjectDetail = () => {
               <h3>Project info</h3>
               <label>
                 <span>Project name *</span>
-                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canEdit} maxLength={120} />
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManageProject} maxLength={120} />
               </label>
               <label>
                 <span>Description</span>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} disabled={!canEdit} rows={3} maxLength={2000} />
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} disabled={!canManageProject} rows={3} maxLength={2000} />
               </label>
 
               <div className="form-row">
                 <label>
                   <span>Start date</span>
-                  <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} disabled={!canEdit} />
+                  <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} disabled={!canManageProject} />
                 </label>
                 <label>
                   <span>End date</span>
-                  <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} disabled={!canEdit} />
+                  <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} disabled={!canManageProject} />
                 </label>
               </div>
 
               <div className="form-row">
                 <label>
                   <span>Budget</span>
-                  <input type="number" min="0" step="0.01" value={form.budgetAmount} onChange={(e) => setForm({ ...form, budgetAmount: e.target.value })} disabled={!canEdit} />
+                  <input type="number" min="0" step="0.01" value={form.budgetAmount} onChange={(e) => setForm({ ...form, budgetAmount: e.target.value })} disabled={!canManageProject} />
                 </label>
                 <label>
                   <span>Currency</span>
-                  <input type="text" maxLength={8} value={form.budgetCurrency} onChange={(e) => setForm({ ...form, budgetCurrency: e.target.value.toUpperCase() })} disabled={!canEdit} />
+                  <input type="text" maxLength={8} value={form.budgetCurrency} onChange={(e) => setForm({ ...form, budgetCurrency: e.target.value.toUpperCase() })} disabled={!canManageProject} />
                 </label>
                 <label>
                   <span>Type</span>
-                  <select value={form.budgetType} onChange={(e) => setForm({ ...form, budgetType: e.target.value })} disabled={!canEdit}>
+                  <select value={form.budgetType} onChange={(e) => setForm({ ...form, budgetType: e.target.value })} disabled={!canManageProject}>
                     <option value="hourly">Hourly</option>
                     <option value="fixed">Fixed</option>
                   </select>
                 </label>
               </div>
 
-              {canEdit ? (
+              {canManageProject ? (
                 <div className="settings-actions">
                   <button type="submit" className="btn-primary" disabled={saving}>
                     {saving ? <Loader size={16} className="spin" /> : <Save size={16} />}
@@ -811,23 +1130,26 @@ const ProjectDetail = () => {
                 </div>
               </div>
 
-              {isOwner ? (
-                <form className="member-add-form" onSubmit={handleAddMember}>
-                  <input
-                    type="email"
-                    placeholder="member@example.com"
-                    value={memberEmail}
-                    onChange={(e) => setMemberEmail(e.target.value)}
-                  />
-                  <select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
-                    {MEMBER_ROLE_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                  </select>
-                  <button type="submit" className="btn-primary" disabled={memberSaving}>
-                    {memberSaving ? <Loader size={16} className="spin" /> : <UserPlus size={16} />}
-                    <span>Add</span>
-                  </button>
-                </form>
-              ) : null}
+              {canManageProject ? (() => {
+                const opts = isOwner ? MEMBER_ROLE_OPTIONS : MEMBER_ROLE_OPTIONS.filter((o) => o.value !== 'moderator');
+                return (
+                  <form className="member-add-form" onSubmit={handleAddMember}>
+                    <input
+                      type="email"
+                      placeholder="member@example.com"
+                      value={memberEmail}
+                      onChange={(e) => setMemberEmail(e.target.value)}
+                    />
+                    <select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
+                      {opts.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                    </select>
+                    <button type="submit" className="btn-primary" disabled={memberSaving}>
+                      {memberSaving ? <Loader size={16} className="spin" /> : <UserPlus size={16} />}
+                      <span>Add</span>
+                    </button>
+                  </form>
+                );
+              })() : null}
 
               <div className="members-list">
                 <div className="member-row owner-row">
@@ -859,27 +1181,33 @@ const ProjectDetail = () => {
                         <span className="member-email">{m.user?.email || ''}</span>
                       </div>
                       <span className="member-meta">Added {formatMemberDate(m.addedAt)}</span>
-                      {isOwner ? (
-                        <div className="member-actions">
-                          <select
-                            value={m.role}
-                            onChange={(e) => handleChangeMemberRole(memberId, e.target.value)}
-                            disabled={pending}
-                          >
-                            {MEMBER_ROLE_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-                          </select>
-                          <button
-                            className="icon-btn danger"
-                            title="Remove member"
-                            onClick={() => handleRemoveMember(memberId)}
-                            disabled={pending}
-                          >
-                            {pending ? <Loader size={14} className="spin" /> : <Trash2 size={16} />}
-                          </button>
-                        </div>
-                      ) : (
-                        <span className={`project-role role-${m.role}`}>{m.role}</span>
-                      )}
+                      {(() => {
+                        const subordinate = m.role === 'editor' || m.role === 'reviewer' || m.role === 'viewer';
+                        const canManageThis = isOwner || (canManageProject && subordinate);
+                        if (!canManageThis) {
+                          return <span className={`project-role role-${m.role}`}>{m.role}</span>;
+                        }
+                        const opts = isOwner ? MEMBER_ROLE_OPTIONS : MEMBER_ROLE_OPTIONS.filter((o) => o.value !== 'moderator');
+                        return (
+                          <div className="member-actions">
+                            <select
+                              value={m.role}
+                              onChange={(e) => handleChangeMemberRole(memberId, e.target.value)}
+                              disabled={pending}
+                            >
+                              {opts.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                            </select>
+                            <button
+                              className="icon-btn danger"
+                              title="Remove member"
+                              onClick={() => handleRemoveMember(memberId)}
+                              disabled={pending}
+                            >
+                              {pending ? <Loader size={14} className="spin" /> : <Trash2 size={16} />}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -918,14 +1246,48 @@ const ProjectDetail = () => {
         )}
       </div>
 
-      {showTaskModal ? (
+      {showTaskModal ? (() => {
+        const taskAccess = editingTaskRef?.access;
+        const canWriteTask = taskAccess === 'owner' || taskAccess === 'write' || (canEdit && !editingTaskId);
+        const taskReadOnly = !!editingTaskId && (!canWriteTask || !editMode);
+        return (
         <div className="modal-overlay" onClick={handleCloseTaskModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editingTaskId ? 'Edit Task' : 'New Task'}</h3>
-              <button className="btn-close" onClick={handleCloseTaskModal} title="Close">
-                <X size={24} />
-              </button>
+              <h3>{editingTaskId ? (editMode ? 'Edit Task' : 'Task') : 'New Task'}</h3>
+              <div className="modal-header-actions">
+                {editingTaskId && editingTaskRef ? (
+                  <>
+                    {canWriteTask && !editMode ? (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        title="Edit"
+                        onClick={() => setEditMode(true)}
+                      >
+                        <Save size={16} />
+                        <span>Edit</span>
+                      </button>
+                    ) : null}
+                    {editingTaskRef.access === 'owner' ? (
+                      <button
+                        type="button"
+                        className="icon-btn danger"
+                        title="Move to trash"
+                        onClick={async () => {
+                          setShowTaskModal(false);
+                          await handleDeleteTask(editingTaskRef);
+                        }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
+                <button className="btn-close" onClick={handleCloseTaskModal} title="Close">
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
@@ -938,10 +1300,12 @@ const ProjectDetail = () => {
                 onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
                 maxLength={120}
                 autoFocus
+                disabled={taskReadOnly}
               />
             </div>
 
             <form onSubmit={handleSaveTask}>
+            <fieldset disabled={taskReadOnly} style={{ border: 'none', padding: 0, margin: 0 }}>
               <div className="form-row">
                 <div className="form-group half">
                   <label>Category</label>
@@ -971,14 +1335,19 @@ const ProjectDetail = () => {
 
               <div className="form-row">
                 <div className="form-group half">
-                  <label>Progress: {Math.max(0, Math.min(100, Number(taskForm.progress) || 0))}%</label>
+                  <label>
+                    Progress: {Math.max(0, Math.min(100, Number(taskForm.progress) || 0))}%
+                    {(editingSubtaskStats?.total || 0) > 0 ? (
+                      <span className="progress-locked-hint" title="Auto-computed from subtasks"> (auto)</span>
+                    ) : null}
+                  </label>
                   <div className="progress-edit">
                     <input
                       type="range"
                       min={0}
                       max={100}
                       value={taskForm.progress}
-                      disabled={taskForm.cancelled}
+                      disabled={taskForm.cancelled || (editingSubtaskStats?.total || 0) > 0}
                       onChange={(e) => setTaskForm({ ...taskForm, progress: parseInt(e.target.value || '0', 10) })}
                     />
                     <input
@@ -986,7 +1355,7 @@ const ProjectDetail = () => {
                       min={0}
                       max={100}
                       value={taskForm.progress}
-                      disabled={taskForm.cancelled}
+                      disabled={taskForm.cancelled || (editingSubtaskStats?.total || 0) > 0}
                       onChange={(e) => setTaskForm({ ...taskForm, progress: parseInt(e.target.value || '0', 10) })}
                     />
                   </div>
@@ -1009,19 +1378,31 @@ const ProjectDetail = () => {
 
               <div className="form-row">
                 <div className="form-group half">
-                  <label>Assignee</label>
-                  <select
-                    className="custom-select"
-                    value={taskForm.assignee}
-                    onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })}
-                  >
-                    <option value="">— Unassigned,</option>
-                    {assigneeOptions.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}{o.role === 'owner' ? ' (owner)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <label>Assignees</label>
+                  <div className="assignee-picker">
+                    {assigneeOptions.length === 0 ? (
+                      <span className="muted">No project members.</span>
+                    ) : (
+                      assigneeOptions.map((o) => {
+                        const checked = (taskForm.assignees || []).includes(o.id);
+                        return (
+                          <label className={`assignee-pill-toggle ${checked ? 'on' : ''}`} key={o.id}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = new Set(taskForm.assignees || []);
+                                if (e.target.checked) next.add(o.id);
+                                else next.delete(o.id);
+                                setTaskForm({ ...taskForm, assignees: Array.from(next) });
+                              }}
+                            />
+                            <span>{o.label}{o.role === 'owner' ? ' (owner)' : ''}</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
                 <div className="form-group half">
                   <label>Estimated hours</label>
@@ -1070,18 +1451,95 @@ const ProjectDetail = () => {
               ) : null}
 
               <div className="modal-footer">
-                <button type="button" className="btn-cancel" onClick={handleCloseTaskModal} disabled={taskSaving}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-save" disabled={taskSaving}>
-                  {taskSaving ? <Loader size={16} className="spin" /> : null}
-                  <span>{taskSaving ? 'Saving…' : editingTaskId ? 'Save' : 'Create'}</span>
-                </button>
+                {taskReadOnly ? null : (
+                  <button
+                    type="button"
+                    className="btn-cancel"
+                    onClick={() => {
+                      if (editingTaskId && editMode) {
+                        if (editingTaskRef) handleOpenEditTask(editingTaskRef);
+                        else setEditMode(false);
+                      } else {
+                        handleCloseTaskModal();
+                      }
+                    }}
+                    disabled={taskSaving}
+                  >
+                    Cancel
+                  </button>
+                )}
+                {taskReadOnly ? null : (
+                  <button type="submit" className="btn-save" disabled={taskSaving}>
+                    {taskSaving ? <Loader size={16} className="spin" /> : null}
+                    <span>{taskSaving ? 'Saving…' : editingTaskId ? 'Save' : 'Create'}</span>
+                  </button>
+                )}
               </div>
+            </fieldset>
             </form>
+
+            {editingTaskId ? (
+              <TaskRelationsSection
+                taskId={editingTaskId}
+                projectId={id}
+                parentTaskId={editingTaskParent}
+                canEdit={canEdit && editMode}
+                onEditTask={(t) => handleOpenEditTask(t)}
+                onChange={fetchTasks}
+              />
+            ) : null}
+
+            {editingTaskId ? (
+              <section className="task-comments-inline">
+                <h4><MessageSquare size={14} /> Comments {commentList.length ? `(${commentList.length})` : ''}</h4>
+                <div className="comment-list">
+                  {commentsLoading && commentList.length === 0 ? (
+                    <div className="muted">Loading…</div>
+                  ) : commentList.length === 0 ? (
+                    <div className="muted">No comments yet.</div>
+                  ) : (
+                    commentList.map((c, idx) => (
+                      <div key={c._id || idx} className="comment-item">
+                        <div className="comment-meta">
+                          <span className="comment-author">{c.user?.username || c.user?.email || 'Unknown'}</span>
+                          <span className="comment-date">
+                            {c.createdAt ? new Date(c.createdAt).toLocaleString('vi-VN') : ''}
+                          </span>
+                        </div>
+                        <div className="comment-text">{c.text}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {canComment ? (
+                  <div className="comment-box">
+                    <textarea
+                      className="custom-input"
+                      rows={2}
+                      placeholder="Write a comment…"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      disabled={commentsLoading}
+                    />
+                    <button
+                      type="button"
+                      className="btn-save"
+                      onClick={handleSendComment}
+                      disabled={commentsLoading || !commentText.trim()}
+                    >
+                      Send
+                    </button>
+                  </div>
+                ) : (
+                  <div className="muted">Your role does not allow commenting.</div>
+                )}
+              </section>
+            ) : null}
           </div>
         </div>
-      ) : null}
+        );
+      })() : null}
+
     </div>
   );
 };

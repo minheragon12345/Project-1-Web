@@ -10,6 +10,7 @@ import {
   Monitor,
   RefreshCcw,
   Sun,
+  LogOut,
 } from 'lucide-react';
 import { getProjects, getProject } from '../services/projectService';
 import { listTimeEntries } from '../services/timeEntryService';
@@ -259,6 +260,18 @@ const Reports = () => {
             onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
           >
             <ArrowLeft size={18} /> Back
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.dispatchEvent(new Event('authChange'));
+              navigate('/login');
+            }}
+            title="Sign out"
+          >
+            <LogOut size={18} /> Logout
           </button>
         </div>
       </div>
