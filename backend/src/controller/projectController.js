@@ -13,6 +13,7 @@ const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'moderator', 'editor', 'r
 const ASSIGNABLE_MEMBER_ROLES = Project.ASSIGNABLE_MEMBER_ROLES || ['moderator', 'editor', 'reviewer', 'viewer'];
 const PROJECT_STATUSES = Project.PROJECT_STATUSES || ['active', 'archived'];
 const BUDGET_TYPES = Project.BUDGET_TYPES || ['fixed', 'hourly'];
+const TIME_UNITS = Project.TIME_UNITS || ['hour', 'day', 'week', 'month'];
 
 router.use(auth);
 
@@ -105,6 +106,26 @@ function parseBudget(budget) {
   return out;
 }
 
+function parseTimeUnit(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return 'day';
+  const v = String(value).trim().toLowerCase();
+  if (!TIME_UNITS.includes(v)) {
+    return { error: `timeUnit must be one of ${TIME_UNITS.join(', ')}` };
+  }
+  return v;
+}
+
+function parseNullablePositiveNumber(value, label, { minValue = 1, allowZero = false } = {}) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: `${label} must be a number` };
+  const floor = allowZero ? 0 : minValue;
+  if (n < floor) return { error: `${label} must be >= ${floor}` };
+  return n;
+}
+
 function toUserDto(u) {
   if (!u) return null;
   if (typeof u === 'string') return { id: u };
@@ -126,6 +147,9 @@ function mapProjectForList(p, reqUserId) {
     startDate: p.startDate,
     endDate: p.endDate,
     budget: p.budget,
+    timeUnit: p.timeUnit || 'day',
+    maxHeadcount: p.maxHeadcount ?? null,
+    lostRevenuePerUnit: p.lostRevenuePerUnit ?? null,
     isPersonal: p.isPersonal,
     owner: toUserDto(p.owner),
     memberCount: (p.members?.length || 0) + 1,
@@ -136,7 +160,7 @@ function mapProjectForList(p, reqUserId) {
 }
 
 router.post('/', async (req, res) => {
-  const { name, description, startDate, endDate, budget } = req.body;
+  const { name, description, startDate, endDate, budget, timeUnit, maxHeadcount, lostRevenuePerUnit } = req.body;
 
   try {
     if (!name || !String(name).trim()) {
@@ -157,6 +181,19 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: parsedBudget.error });
     }
 
+    const parsedTimeUnit = parseTimeUnit(timeUnit);
+    if (parsedTimeUnit && typeof parsedTimeUnit === 'object' && parsedTimeUnit.error) {
+      return res.status(400).json({ message: parsedTimeUnit.error });
+    }
+    const parsedHeadcount = parseNullablePositiveNumber(maxHeadcount, 'maxHeadcount');
+    if (parsedHeadcount && typeof parsedHeadcount === 'object' && parsedHeadcount.error) {
+      return res.status(400).json({ message: parsedHeadcount.error });
+    }
+    const parsedRevenue = parseNullablePositiveNumber(lostRevenuePerUnit, 'lostRevenuePerUnit', { minValue: 0, allowZero: true });
+    if (parsedRevenue && typeof parsedRevenue === 'object' && parsedRevenue.error) {
+      return res.status(400).json({ message: parsedRevenue.error });
+    }
+
     const project = await Project.create({
       name: String(name).trim(),
       description: description ? String(description).trim() : '',
@@ -166,6 +203,9 @@ router.post('/', async (req, res) => {
       startDate: parsedStart === undefined ? null : parsedStart,
       endDate: parsedEnd === undefined ? null : parsedEnd,
       budget: parsedBudget || { amount: 0, currency: 'USD', type: 'hourly' },
+      timeUnit: parsedTimeUnit === undefined ? 'day' : parsedTimeUnit,
+      maxHeadcount: parsedHeadcount === undefined ? null : parsedHeadcount,
+      lostRevenuePerUnit: parsedRevenue === undefined ? null : parsedRevenue,
       isPersonal: false,
       isDeleted: false,
     });
@@ -258,6 +298,9 @@ router.get('/:id', async (req, res) => {
         startDate: project.startDate,
         endDate: project.endDate,
         budget: project.budget,
+        timeUnit: project.timeUnit || 'day',
+        maxHeadcount: project.maxHeadcount ?? null,
+        lostRevenuePerUnit: project.lostRevenuePerUnit ?? null,
         isPersonal: project.isPersonal,
         owner: toUserDto(project.owner),
         members,
@@ -273,7 +316,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, description, status, startDate, endDate, budget } = req.body;
+  const { name, description, status, startDate, endDate, budget, timeUnit, maxHeadcount, lostRevenuePerUnit } = req.body;
 
   try {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
@@ -313,6 +356,27 @@ router.put('/:id', async (req, res) => {
       const parsed = parseBudget(budget);
       if (parsed && parsed.error) return res.status(400).json({ message: parsed.error });
       project.budget = { ...(project.budget?.toObject?.() || project.budget || {}), ...(parsed || {}) };
+    }
+    if (timeUnit !== undefined) {
+      const parsed = parseTimeUnit(timeUnit);
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      project.timeUnit = parsed;
+    }
+    if (maxHeadcount !== undefined) {
+      const parsed = parseNullablePositiveNumber(maxHeadcount, 'maxHeadcount');
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      project.maxHeadcount = parsed;
+    }
+    if (lostRevenuePerUnit !== undefined) {
+      const parsed = parseNullablePositiveNumber(lostRevenuePerUnit, 'lostRevenuePerUnit', { minValue: 0, allowZero: true });
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      project.lostRevenuePerUnit = parsed;
     }
 
     await project.save();

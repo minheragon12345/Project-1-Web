@@ -37,6 +37,40 @@ const NoteSchema = new mongoose.Schema(
       default: 0,
     },
 
+    duration: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    peopleRequired: {
+      type: Number,
+      min: 1,
+      default: 1,
+    },
+
+    minDuration: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+
+    marginalCost: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+
+    actualStart: {
+      type: Date,
+      default: null,
+    },
+
+    actualEnd: {
+      type: Date,
+      default: null,
+    },
+
     parentTask: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Note',

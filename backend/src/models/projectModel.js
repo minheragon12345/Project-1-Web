@@ -4,6 +4,7 @@ const PROJECT_STATUSES = ['active', 'archived'];
 const MEMBER_ROLES = ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
 const ASSIGNABLE_MEMBER_ROLES = ['moderator', 'editor', 'reviewer', 'viewer'];
 const BUDGET_TYPES = ['fixed', 'hourly'];
+const TIME_UNITS = ['hour', 'day', 'week', 'month'];
 
 const ProjectSchema = new mongoose.Schema(
   {
@@ -60,6 +61,24 @@ const ProjectSchema = new mongoose.Schema(
       type: { type: String, enum: BUDGET_TYPES, default: 'hourly' },
     },
 
+    timeUnit: {
+      type: String,
+      enum: TIME_UNITS,
+      default: 'day',
+    },
+
+    maxHeadcount: {
+      type: Number,
+      min: 1,
+      default: null,
+    },
+
+    lostRevenuePerUnit: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+
     isPersonal: {
       type: Boolean,
       default: false,
@@ -89,3 +108,4 @@ module.exports.PROJECT_STATUSES = PROJECT_STATUSES;
 module.exports.MEMBER_ROLES = MEMBER_ROLES;
 module.exports.ASSIGNABLE_MEMBER_ROLES = ASSIGNABLE_MEMBER_ROLES;
 module.exports.BUDGET_TYPES = BUDGET_TYPES;
+module.exports.TIME_UNITS = TIME_UNITS;

@@ -82,6 +82,43 @@ function parseDeadline(value) {
   return d;
 }
 
+function parseDuration(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return 0;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: 'duration must be a number' };
+  if (n < 0) return { error: 'duration must be >= 0' };
+  if (n > 100000) return { error: 'duration must be <= 100000' };
+  return Math.round(n * 100) / 100;
+}
+
+function parsePeopleRequired(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return 1;
+  const n = Number(value);
+  if (!Number.isInteger(n)) return { error: 'peopleRequired must be an integer' };
+  if (n < 1) return { error: 'peopleRequired must be >= 1' };
+  if (n > 10000) return { error: 'peopleRequired must be <= 10000' };
+  return n;
+}
+
+function parseNullableNonNegative(value, label) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { error: `${label} must be a number` };
+  if (n < 0) return { error: `${label} must be >= 0` };
+  return Math.round(n * 100) / 100;
+}
+
+function parseNullableDate(value, label) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return { error: `${label} must be a valid date` };
+  return d;
+}
+
 function parseEstimatedHours(value) {
   if (value === undefined) return undefined;
   if (value === null || value === '') return 0;
@@ -360,6 +397,12 @@ function mapNoteForList(noteLean, reqUserId, extras = {}) {
     assignees: toAssigneesDto(noteLean.assignees),
     estimatedHours: typeof noteLean.estimatedHours === 'number' ? noteLean.estimatedHours : 0,
     actualHours: typeof noteLean.actualHours === 'number' ? noteLean.actualHours : 0,
+    duration: typeof noteLean.duration === 'number' ? noteLean.duration : 0,
+    peopleRequired: typeof noteLean.peopleRequired === 'number' ? noteLean.peopleRequired : 1,
+    minDuration: typeof noteLean.minDuration === 'number' ? noteLean.minDuration : null,
+    marginalCost: typeof noteLean.marginalCost === 'number' ? noteLean.marginalCost : null,
+    actualStart: noteLean.actualStart || null,
+    actualEnd: noteLean.actualEnd || null,
     parentTask: noteLean.parentTask ? String(noteLean.parentTask) : null,
     dependencies: dependencyIds,
     isBlocked,
@@ -423,6 +466,12 @@ router.post('/', async (req, res) => {
     assignees: assigneesInput,
     estimatedHours,
     parentTask: parentTaskId,
+    duration,
+    peopleRequired,
+    minDuration,
+    marginalCost,
+    actualStart,
+    actualEnd,
   } = req.body;
 
   try {
@@ -492,6 +541,31 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: assigneesResult.error });
     }
 
+    const parsedDuration = parseDuration(duration);
+    if (parsedDuration && typeof parsedDuration === 'object' && parsedDuration.error) {
+      return res.status(400).json({ message: parsedDuration.error });
+    }
+    const parsedPeople = parsePeopleRequired(peopleRequired);
+    if (parsedPeople && typeof parsedPeople === 'object' && parsedPeople.error) {
+      return res.status(400).json({ message: parsedPeople.error });
+    }
+    const parsedMinDuration = parseNullableNonNegative(minDuration, 'minDuration');
+    if (parsedMinDuration && typeof parsedMinDuration === 'object' && parsedMinDuration.error) {
+      return res.status(400).json({ message: parsedMinDuration.error });
+    }
+    const parsedMarginalCost = parseNullableNonNegative(marginalCost, 'marginalCost');
+    if (parsedMarginalCost && typeof parsedMarginalCost === 'object' && parsedMarginalCost.error) {
+      return res.status(400).json({ message: parsedMarginalCost.error });
+    }
+    const parsedActualStart = parseNullableDate(actualStart, 'actualStart');
+    if (parsedActualStart && typeof parsedActualStart === 'object' && parsedActualStart.error) {
+      return res.status(400).json({ message: parsedActualStart.error });
+    }
+    const parsedActualEnd = parseNullableDate(actualEnd, 'actualEnd');
+    if (parsedActualEnd && typeof parsedActualEnd === 'object' && parsedActualEnd.error) {
+      return res.status(400).json({ message: parsedActualEnd.error });
+    }
+
     const newNote = await Note.create({
       user: req.userId,
       project: projectRef,
@@ -504,6 +578,12 @@ router.post('/', async (req, res) => {
       priority: parsedPriority === undefined ? 0 : parsedPriority,
       assignees: assigneesResult.value === undefined ? [] : assigneesResult.value,
       estimatedHours: typeof parsedHours === 'number' ? parsedHours : 0,
+      duration: typeof parsedDuration === 'number' ? parsedDuration : 0,
+      peopleRequired: typeof parsedPeople === 'number' ? parsedPeople : 1,
+      minDuration: parsedMinDuration === undefined ? null : parsedMinDuration,
+      marginalCost: parsedMarginalCost === undefined ? null : parsedMarginalCost,
+      actualStart: parsedActualStart === undefined ? null : parsedActualStart,
+      actualEnd: parsedActualEnd === undefined ? null : parsedActualEnd,
       parentTask: parentResult.value || null,
       dependencies: [],
       comments: [],
@@ -729,6 +809,12 @@ router.put('/:id', async (req, res) => {
     assignees: assigneesInput,
     estimatedHours,
     parentTask: parentTaskId,
+    duration,
+    peopleRequired,
+    minDuration,
+    marginalCost,
+    actualStart,
+    actualEnd,
   } = req.body;
 
   try {
@@ -848,6 +934,54 @@ router.put('/:id', async (req, res) => {
         return res.status(400).json({ message: parsedHours.error });
       }
       note.estimatedHours = typeof parsedHours === 'number' ? parsedHours : 0;
+    }
+
+    if (duration !== undefined) {
+      const parsed = parseDuration(duration);
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      note.duration = typeof parsed === 'number' ? parsed : 0;
+    }
+
+    if (peopleRequired !== undefined) {
+      const parsed = parsePeopleRequired(peopleRequired);
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      note.peopleRequired = typeof parsed === 'number' ? parsed : 1;
+    }
+
+    if (minDuration !== undefined) {
+      const parsed = parseNullableNonNegative(minDuration, 'minDuration');
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      note.minDuration = parsed;
+    }
+
+    if (marginalCost !== undefined) {
+      const parsed = parseNullableNonNegative(marginalCost, 'marginalCost');
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      note.marginalCost = parsed;
+    }
+
+    if (actualStart !== undefined) {
+      const parsed = parseNullableDate(actualStart, 'actualStart');
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      note.actualStart = parsed;
+    }
+
+    if (actualEnd !== undefined) {
+      const parsed = parseNullableDate(actualEnd, 'actualEnd');
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      note.actualEnd = parsed;
     }
 
     if (assigneesInput !== undefined) {

@@ -56,7 +56,10 @@ const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 import { useTheme } from '../hooks/useTheme';
 import './ProjectDetail.css';
 
-const TASK_CATEGORIES = ['Study', 'Health', 'Finance', 'Work', 'Personal', 'Other'];
+const TIME_UNIT_SHORT = { hour: 'h', day: 'd', week: 'w', month: 'mo' };
+function unitLabel(unit) {
+  return TIME_UNIT_SHORT[unit] || 'd';
+}
 
 const TABS_BASE = [
   { key: 'board', label: 'Board', icon: LayoutGrid },
@@ -119,13 +122,15 @@ const ProjectDetail = () => {
   const [taskForm, setTaskForm] = useState({
     title: '',
     content: '',
-    priority: 1,
+    priority: 0,
     deadline: '',
     progress: 0,
     category: 'Other',
     cancelled: false,
     assignees: [],
     estimatedHours: 0,
+    duration: 0,
+    peopleRequired: 1,
   });
   const [taskSaving, setTaskSaving] = useState(false);
 
@@ -428,13 +433,15 @@ const ProjectDetail = () => {
     setTaskForm({
       title: '',
       content: '',
-      priority: 1,
+      priority: 0,
       deadline: '',
       progress: 0,
       category: 'Other',
       cancelled: false,
       assignees: [],
       estimatedHours: 0,
+      duration: 0,
+      peopleRequired: 1,
     });
     setCommentList([]);
     setCommentText('');
@@ -468,7 +475,7 @@ const ProjectDetail = () => {
     setTaskForm({
       title: task.title || '',
       content: task.content || '',
-      priority: typeof task.priority === 'number' ? task.priority : 1,
+      priority: typeof task.priority === 'number' ? task.priority : 0,
       deadline: toDateInputValue(task.deadline),
       progress: typeof task.progress === 'number' ? task.progress : 0,
       category: task.category || 'Other',
@@ -477,6 +484,8 @@ const ProjectDetail = () => {
         ? task.assignees.map((a) => String(a?.id || a?._id || a)).filter(Boolean)
         : [],
       estimatedHours: typeof task.estimatedHours === 'number' ? task.estimatedHours : 0,
+      duration: typeof task.duration === 'number' ? task.duration : 0,
+      peopleRequired: typeof task.peopleRequired === 'number' ? task.peopleRequired : 1,
     });
     fetchTaskComments(task._id || task.id);
     setShowTaskModal(true);
@@ -500,6 +509,8 @@ const ProjectDetail = () => {
       category: taskForm.category || 'Other',
       assignees: Array.isArray(taskForm.assignees) ? taskForm.assignees : [],
       estimatedHours: Math.max(0, Number(taskForm.estimatedHours) || 0),
+      duration: Math.max(0, Number(taskForm.duration) || 0),
+      peopleRequired: Math.max(1, Math.floor(Number(taskForm.peopleRequired) || 1)),
     };
     if (isAutoProgress) {
       if (taskForm.cancelled) payload.status = 'cancelled';
@@ -737,6 +748,7 @@ const ProjectDetail = () => {
                 canEdit={canEdit}
                 onTaskMove={handleTaskMove}
                 onCardClick={handleOpenEditTask}
+                timeUnit={project?.timeUnit || 'day'}
               />
             )}
           </div>
@@ -751,8 +763,7 @@ const ProjectDetail = () => {
             const visibleTasks = q
               ? sourceTasks.filter((t) =>
                   (t.title || '').toLowerCase().includes(q) ||
-                  (t.content || '').toLowerCase().includes(q) ||
-                  (t.category || '').toLowerCase().includes(q),
+                  (t.content || '').toLowerCase().includes(q),
                 )
               : sourceTasks;
             const isLoading = listTrashView ? trashLoading : tasksLoading;
@@ -767,7 +778,7 @@ const ProjectDetail = () => {
                   <Search size={14} />
                   <input
                     type="text"
-                    placeholder="Search title / content / category…"
+                    placeholder="Search title / content…"
                     value={listSearch}
                     onChange={(e) => setListSearch(e.target.value)}
                   />
@@ -837,8 +848,16 @@ const ProjectDetail = () => {
                           {t.title || <span className="task-placeholder">(no title)</span>}
                         </div>
                         <div className="task-sub">
-                          <span className="priority-chip">P{t.priority || 0}</span>
-                          <span>{t.category || 'Other'}</span>
+                          {t.duration > 0 ? (
+                            <span className="duration-chip" title="Duration">
+                              Dur: {t.duration}{unitLabel(project?.timeUnit || 'day')}
+                            </span>
+                          ) : null}
+                          {t.peopleRequired > 1 ? (
+                            <span className="people-chip" title="People required">
+                              👥 {t.peopleRequired}
+                            </span>
+                          ) : null}
                           {t.isBlocked ? (
                             <span className="blocked-chip" title="Blocked by dependencies">
                               <Lock size={10} /> Blocked
@@ -870,9 +889,6 @@ const ProjectDetail = () => {
                           ) : (
                             <span className="muted">Unassigned</span>
                           )}
-                          {t.estimatedHours > 0 ? (
-                            <span className="muted">~{t.estimatedHours}h</span>
-                          ) : null}
                           {t.owner?.username ? <span className="muted">• {t.owner.username}</span> : null}
                         </div>
                         <div className="task-progress">
@@ -1308,27 +1324,28 @@ const ProjectDetail = () => {
             <fieldset disabled={taskReadOnly} style={{ border: 'none', padding: 0, margin: 0 }}>
               <div className="form-row">
                 <div className="form-group half">
-                  <label>Category</label>
-                  <select
-                    className="custom-select"
-                    value={taskForm.category}
-                    onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
-                  >
-                    {TASK_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group half">
-                  <label>Priority</label>
+                  <label>Duration ({unitLabel(project?.timeUnit || 'day')})</label>
                   <input
                     type="number"
                     className="custom-input"
                     min={0}
-                    max={1024}
-                    value={taskForm.priority}
-                    onChange={(e) => setTaskForm({ ...taskForm, priority: parseInt(e.target.value || '0', 10) })}
+                    max={100000}
+                    step={0.5}
+                    value={taskForm.duration}
+                    onChange={(e) => setTaskForm({ ...taskForm, duration: Number(e.target.value || 0) })}
+                  />
+                </div>
+
+                <div className="form-group half">
+                  <label>People required</label>
+                  <input
+                    type="number"
+                    className="custom-input"
+                    min={1}
+                    max={10000}
+                    step={1}
+                    value={taskForm.peopleRequired}
+                    onChange={(e) => setTaskForm({ ...taskForm, peopleRequired: parseInt(e.target.value || '1', 10) })}
                   />
                 </div>
               </div>
@@ -1405,27 +1422,14 @@ const ProjectDetail = () => {
                   </div>
                 </div>
                 <div className="form-group half">
-                  <label>Estimated hours</label>
+                  <label>Deadline</label>
                   <input
-                    type="number"
+                    type="date"
                     className="custom-input"
-                    min={0}
-                    max={10000}
-                    step={0.25}
-                    value={taskForm.estimatedHours}
-                    onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: Number(e.target.value || 0) })}
+                    value={taskForm.deadline}
+                    onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label>Deadline</label>
-                <input
-                  type="date"
-                  className="custom-input"
-                  value={taskForm.deadline}
-                  onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })}
-                />
               </div>
 
               <div className="form-group">
