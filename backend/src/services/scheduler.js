@@ -189,6 +189,43 @@ function computeSchedule(tasks) {
   return { projectDuration, criticalPath, criticalSet, slacks };
 }
 
+/*
+  Resource loading curve — sums peopleRequired of all tasks active at each
+  integer time step in [0, projectDuration]. Pure function over scheduleTasks
+  (the array returned by the schedule endpoint or computed locally).
+
+  Input:
+    scheduleTasks: [{ id, ES, duration, peopleRequired }]
+    projectDuration: Number
+  Output:
+    { peak, points: [{ t, demand }] }
+*/
+function computeResourceCurve(scheduleTasks, projectDuration) {
+  const points = [];
+  const D = Math.max(0, Math.ceil(Number(projectDuration) || 0));
+  if (!Array.isArray(scheduleTasks) || scheduleTasks.length === 0 || D === 0) {
+    return { peak: 0, points: [{ t: 0, demand: 0 }] };
+  }
+
+  let peak = 0;
+  for (let t = 0; t <= D; t += 1) {
+    let demand = 0;
+    for (const task of scheduleTasks) {
+      const es = Number(task.ES) || 0;
+      const dur = Number(task.duration) || 0;
+      const r = Number(task.peopleRequired) || 0;
+      if (dur <= 0) continue;
+      const ef = es + dur;
+      // Task active during half-open interval [es, ef).
+      if (t >= es && t < ef) demand += r;
+    }
+    if (demand > peak) peak = demand;
+    points.push({ t, demand });
+  }
+
+  return { peak, points };
+}
+
 module.exports = {
   buildGraph,
   topologicalSort,
@@ -197,4 +234,5 @@ module.exports = {
   computeSlacks,
   findCriticalPath,
   computeSchedule,
+  computeResourceCurve,
 };

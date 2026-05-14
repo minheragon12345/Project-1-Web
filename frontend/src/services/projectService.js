@@ -133,3 +133,13 @@ export const getProjectSchedule = async (id) => {
     throw new Error(message);
   }
 };
+
+export const getResourceCurve = async (id) => {
+  try {
+    const res = await API.get(`/projects/${id}/resource-curve`);
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not load resource curve';
+    throw new Error(message);
+  }
+};

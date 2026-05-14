@@ -55,6 +55,7 @@ import TimeLogSection from '../components/TimeLogSection';
 import TaskRelationsSection from '../components/TaskRelationsSection';
 const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 const ProjectGantt = lazy(() => import('../components/ProjectGantt'));
+const ResourceCurve = lazy(() => import('../components/ResourceCurve'));
 import { useTheme } from '../hooks/useTheme';
 import { useSchedule } from '../hooks/useSchedule';
 import './ProjectDetail.css';
@@ -832,6 +833,14 @@ const ProjectDetail = () => {
                 />
               </Suspense>
             )}
+            {schedule && (schedule.tasks?.length || 0) > 0 ? (
+              <Suspense fallback={null}>
+                <ResourceCurve
+                  projectId={id}
+                  refreshKey={`${schedule.projectDuration}|${tasks.length}`}
+                />
+              </Suspense>
+            ) : null}
           </div>
         ) : tab === 'list' ? (
           (() => {

@@ -7,7 +7,7 @@
 */
 
 const assert = require('node:assert');
-const { computeSchedule } = require('./scheduler');
+const { computeSchedule, computeResourceCurve } = require('./scheduler');
 
 // ----- §1.6 running example -----
 const tasks = [
@@ -105,6 +105,37 @@ for (const id of Object.keys(expectedFree)) {
   ]);
   assert.strictEqual(r.projectDuration, 5);
   assert.strictEqual(r.slacks.get('B').ES, 2);
+}
+
+// ----- Resource curve: study-guide §2.8 unlimited-resources example -----
+// Tasks from §2.8 unlimited plan. Peak 8 at [2,3).
+{
+  const tasks = [
+    { id: 'A', ES: 0, duration: 2, peopleRequired: 4 },
+    { id: 'B', ES: 0, duration: 3, peopleRequired: 3 },
+    { id: 'C', ES: 2, duration: 2, peopleRequired: 5 },
+    { id: 'D', ES: 3, duration: 4, peopleRequired: 2 },
+    { id: 'E', ES: 4, duration: 3, peopleRequired: 4 },
+    { id: 'F', ES: 7, duration: 2, peopleRequired: 3 },
+    { id: 'G', ES: 9, duration: 2, peopleRequired: 2 },
+  ];
+  const { peak, points } = computeResourceCurve(tasks, 11);
+  assert.strictEqual(peak, 8, `peak expected 8, got ${peak}`);
+  const at = (t) => points.find((p) => p.t === t)?.demand;
+  assert.strictEqual(at(0), 7, `t=0: ${at(0)}`);
+  assert.strictEqual(at(2), 8, `t=2: ${at(2)}`);
+  assert.strictEqual(at(3), 7, `t=3: ${at(3)}`);
+  assert.strictEqual(at(4), 6, `t=4: ${at(4)}`);
+  assert.strictEqual(at(7), 3, `t=7: ${at(7)}`);
+  assert.strictEqual(at(9), 2, `t=9: ${at(9)}`);
+  assert.strictEqual(at(11), 0, `t=11: ${at(11)}`);
+}
+
+// ----- Resource curve: empty -----
+{
+  const r = computeResourceCurve([], 0);
+  assert.strictEqual(r.peak, 0);
+  assert.deepStrictEqual(r.points, [{ t: 0, demand: 0 }]);
 }
 
 console.log('All scheduler tests pass.');

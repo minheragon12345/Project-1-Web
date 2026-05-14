@@ -7,7 +7,7 @@ const TimeEntry = require('../models/timeEntryModel');
 const AuditLog = require('../models/auditLogModel');
 const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
-const { computeSchedule } = require('../services/scheduler');
+const { computeSchedule, computeResourceCurve } = require('../services/scheduler');
 
 const router = express.Router();
 const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
@@ -870,6 +870,69 @@ router.get('/:id/schedule', async (req, res) => {
       timeUnit: project.timeUnit || 'day',
       criticalPath: schedule.criticalPath,
       tasks,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Resource loading curve: sums peopleRequired of active tasks at each time
+// step. Uses the same CPM schedule produced above. Returns the curve plus a
+// reference line (maxHeadcount if set, else members + owner).
+router.get('/:id/resource-curve', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
+
+    const project = await Project.findOne({ _id: id, isDeleted: false })
+      .select('owner members isDeleted timeUnit maxHeadcount');
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canRead(project, req.userId)) return res.status(403).json({ message: 'Forbidden' });
+
+    const tasksRaw = await Note.find({ project: id, isDeleted: false })
+      .select('_id duration dependencies peopleRequired')
+      .lean();
+
+    const tasksForScheduler = tasksRaw.map((t) => ({
+      id: String(t._id),
+      duration: Number(t.duration) || 0,
+      dependencies: (t.dependencies || []).map((d) => String(d)),
+    }));
+
+    let schedule;
+    try {
+      schedule = computeSchedule(tasksForScheduler);
+    } catch (err) {
+      if (/cycle/i.test(err.message)) {
+        return res.status(400).json({ message: 'Cycle detected in dependency graph' });
+      }
+      throw err;
+    }
+
+    const scheduleTasks = tasksRaw.map((t) => {
+      const s = schedule.slacks.get(String(t._id));
+      return {
+        id: String(t._id),
+        ES: s?.ES ?? 0,
+        duration: Number(t.duration) || 0,
+        peopleRequired: Number(t.peopleRequired) || 1,
+      };
+    });
+
+    const { peak, points } = computeResourceCurve(scheduleTasks, schedule.projectDuration);
+
+    // Reference line: explicit cap, else members + 1 owner.
+    const reference = project.maxHeadcount != null
+      ? Number(project.maxHeadcount)
+      : (Array.isArray(project.members) ? project.members.length : 0) + 1;
+
+    return res.json({
+      peak,
+      points,
+      reference,
+      timeUnit: project.timeUnit || 'day',
+      projectDuration: schedule.projectDuration,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
