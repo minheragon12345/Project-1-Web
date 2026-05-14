@@ -8,6 +8,7 @@ const AuditLog = require('../models/auditLogModel');
 const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
 const { computeSchedule, computeResourceCurve } = require('../services/scheduler');
+const { serialSchedule } = require('../services/serialScheduler');
 
 const router = express.Router();
 const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
@@ -812,14 +813,17 @@ router.get('/:id/audit-log', async (req, res) => {
 
 // CPM schedule: forward/backward pass over the project's dependency graph.
 // Returns earliest/latest dates, slacks, and the critical path.
+// Query: ?constrained=true → re-runs the serial-method scheduler (§2.7)
+//   under project.maxHeadcount and overrides ES/EF in the response.
 router.get('/:id/schedule', async (req, res) => {
   const { id } = req.params;
+  const constrained = String(req.query.constrained || '').toLowerCase() === 'true';
 
   try {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
 
     const project = await Project.findOne({ _id: id, isDeleted: false })
-      .select('owner members isDeleted timeUnit');
+      .select('owner members isDeleted timeUnit maxHeadcount');
     if (!project) return res.status(404).json({ message: 'Project not found' });
     if (!canRead(project, req.userId)) return res.status(403).json({ message: 'Forbidden' });
 
@@ -843,9 +847,39 @@ router.get('/:id/schedule', async (req, res) => {
       throw err;
     }
 
+    // Constrained pass (optional). Reuses unconstrained ES/LS for tie-break.
+    let serialResult = null;
+    if (constrained) {
+      if (project.maxHeadcount == null) {
+        return res.status(400).json({ message: 'project.maxHeadcount is not set; cannot run constrained schedule' });
+      }
+      try {
+        const enriched = tasksForScheduler.map((t) => {
+          const s = schedule.slacks.get(String(t.id));
+          const raw = tasksRaw.find((r) => String(r._id) === String(t.id));
+          return {
+            ...t,
+            peopleRequired: Number(raw?.peopleRequired) || 1,
+            ES: s?.ES ?? 0,
+            LS: s?.LS ?? 0,
+          };
+        });
+        serialResult = serialSchedule(enriched, Number(project.maxHeadcount));
+      } catch (err) {
+        return res.status(400).json({ message: err.message || 'Serial scheduler failed' });
+      }
+    }
+
+    const serialById = serialResult
+      ? new Map(serialResult.tasks.map((t) => [String(t.id), t]))
+      : null;
+
     const tasks = tasksRaw.map((t) => {
       const sid = String(t._id);
       const s = schedule.slacks.get(sid);
+      const serial = serialById?.get(sid);
+      const ES = serial ? serial.ES : (s?.ES ?? 0);
+      const EF = serial ? serial.EF : (s?.EF ?? 0);
       return {
         id: sid,
         title: t.title || '',
@@ -855,8 +889,8 @@ router.get('/:id/schedule', async (req, res) => {
         status: t.status,
         actualStart: t.actualStart || null,
         actualEnd: t.actualEnd || null,
-        ES: s?.ES ?? 0,
-        EF: s?.EF ?? 0,
+        ES,
+        EF,
         LS: s?.LS ?? 0,
         LF: s?.LF ?? 0,
         totalSlack: s?.totalSlack ?? 0,
@@ -865,8 +899,14 @@ router.get('/:id/schedule', async (req, res) => {
       };
     });
 
+    const constrainedDuration = serialResult?.projectDuration ?? schedule.projectDuration;
+
     return res.json({
-      projectDuration: schedule.projectDuration,
+      mode: serialResult ? 'constrained' : 'unlimited',
+      projectDuration: constrainedDuration,
+      unconstrainedDuration: schedule.projectDuration,
+      delay: serialResult ? constrainedDuration - schedule.projectDuration : 0,
+      maxHeadcount: project.maxHeadcount ?? null,
       timeUnit: project.timeUnit || 'day',
       criticalPath: schedule.criticalPath,
       tasks,

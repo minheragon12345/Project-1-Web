@@ -124,9 +124,10 @@ export const getProjectAuditLog = async (id, { limit = 200 } = {}) => {
   }
 };
 
-export const getProjectSchedule = async (id) => {
+export const getProjectSchedule = async (id, { constrained = false } = {}) => {
   try {
-    const res = await API.get(`/projects/${id}/schedule`);
+    const params = constrained ? { constrained: 'true' } : undefined;
+    const res = await API.get(`/projects/${id}/schedule`, { params });
     return res.data;
   } catch (error) {
     const message = error.response?.data?.message || 'Could not load schedule';

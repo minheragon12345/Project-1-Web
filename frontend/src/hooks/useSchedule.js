@@ -10,7 +10,7 @@ import { getProjectSchedule } from '../services/projectService';
  *
  * byTaskId is a Map<string, taskScheduleEntry> for quick lookup when decorating cards.
  */
-export function useSchedule(projectId, { auto = true } = {}) {
+export function useSchedule(projectId, { auto = true, constrained = false } = {}) {
   const [schedule, setSchedule] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -20,7 +20,7 @@ export function useSchedule(projectId, { auto = true } = {}) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getProjectSchedule(projectId);
+      const data = await getProjectSchedule(projectId, { constrained });
       setSchedule(data);
     } catch (err) {
       setError(err.message || 'Failed to load schedule');
@@ -28,7 +28,7 @@ export function useSchedule(projectId, { auto = true } = {}) {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, constrained]);
 
   useEffect(() => {
     if (auto && projectId) refresh();

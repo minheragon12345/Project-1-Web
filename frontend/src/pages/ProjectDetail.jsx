@@ -114,7 +114,13 @@ const ProjectDetail = () => {
 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
-  const { byTaskId: scheduleByTaskId, schedule, refresh: refreshSchedule } = useSchedule(id);
+  const [constrainedMode, setConstrainedMode] = useState(false);
+  const {
+    byTaskId: scheduleByTaskId,
+    schedule,
+    refresh: refreshSchedule,
+    error: scheduleError,
+  } = useSchedule(id, { constrained: constrainedMode });
   const [ganttBarMode, setGanttBarMode] = useState('Earliest'); // 'Earliest' | 'Latest'
   const [ganttGranularity, setGanttGranularity] = useState('Day');
   const [listSearch, setListSearch] = useState('');
@@ -800,6 +806,28 @@ const ProjectDetail = () => {
                   </button>
                 ))}
               </div>
+              <div
+                className="toggle-group"
+                role="group"
+                aria-label="Resource mode"
+                title={project?.maxHeadcount == null ? 'Set Project.maxHeadcount in Settings to enable constrained mode' : ''}
+              >
+                <button
+                  type="button"
+                  className={!constrainedMode ? 'active' : ''}
+                  onClick={() => setConstrainedMode(false)}
+                >
+                  Unlimited
+                </button>
+                <button
+                  type="button"
+                  className={constrainedMode ? 'active' : ''}
+                  onClick={() => setConstrainedMode(true)}
+                  disabled={project?.maxHeadcount == null}
+                >
+                  Constrained{project?.maxHeadcount != null ? ` (≤${project.maxHeadcount})` : ''}
+                </button>
+              </div>
               <div className="gantt-header-info">
                 {schedule ? (
                   <>
@@ -813,6 +841,17 @@ const ProjectDetail = () => {
                 ) : null}
               </div>
             </div>
+            {constrainedMode && schedule && schedule.mode === 'constrained' && schedule.delay > 0 ? (
+              <div className="gantt-banner">
+                Headcount cap of {schedule.maxHeadcount} delays project by {schedule.delay}
+                {unitLabel(schedule.timeUnit || 'day')} (was {schedule.unconstrainedDuration}, now {schedule.projectDuration}).
+              </div>
+            ) : null}
+            {constrainedMode && scheduleError ? (
+              <div className="gantt-banner error">
+                Constrained schedule failed: {scheduleError}
+              </div>
+            ) : null}
             {tasksLoading || !schedule ? (
               <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading schedule…</span></div>
             ) : (schedule?.tasks?.length || 0) === 0 ? (

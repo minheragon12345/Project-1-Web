@@ -129,3 +129,37 @@
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
+.gantt-banner {
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  background-color: #fef3c7;
+  border: 1px solid rgba(217, 119, 6, 0.4);
+  color: #92400e;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.gantt-banner.error {
+  background-color: #fee2e2;
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #b91c1c;
+}
+
+.dark-theme .gantt-banner {
+  background-color: rgba(217, 119, 6, 0.18);
+  color: #fde68a;
+  border-color: rgba(252, 211, 77, 0.45);
+}
+
+.dark-theme .gantt-banner.error {
+  background-color: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.toggle-group button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
