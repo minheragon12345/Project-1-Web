@@ -18,6 +18,7 @@ import {
   Plus,
   X,
   BarChart3,
+  GanttChart,
   Lock,
   GitBranch,
   ScrollText,
@@ -53,6 +54,7 @@ import KanbanBoard from '../components/KanbanBoard';
 import TimeLogSection from '../components/TimeLogSection';
 import TaskRelationsSection from '../components/TaskRelationsSection';
 const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
+const ProjectGantt = lazy(() => import('../components/ProjectGantt'));
 import { useTheme } from '../hooks/useTheme';
 import { useSchedule } from '../hooks/useSchedule';
 import './ProjectDetail.css';
@@ -65,6 +67,7 @@ function unitLabel(unit) {
 const TABS_BASE = [
   { key: 'board', label: 'Board', icon: LayoutGrid },
   { key: 'list', label: 'List', icon: List },
+  { key: 'timeline', label: 'Timeline', icon: GanttChart },
   { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -111,6 +114,8 @@ const ProjectDetail = () => {
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const { byTaskId: scheduleByTaskId, schedule, refresh: refreshSchedule } = useSchedule(id);
+  const [ganttBarMode, setGanttBarMode] = useState('Earliest'); // 'Earliest' | 'Latest'
+  const [ganttGranularity, setGanttGranularity] = useState('Day');
   const [listSearch, setListSearch] = useState('');
   const [listTrashView, setListTrashView] = useState(false);
   const [trashTasks, setTrashTasks] = useState([]);
@@ -270,14 +275,17 @@ const ProjectDetail = () => {
   const canManageProject = project?.role === 'owner' || project?.role === 'moderator';
   const canViewLog = project?.role === 'owner' || project?.role === 'moderator';
   const canComment = project?.role === 'owner' || project?.role === 'moderator' || project?.role === 'editor' || project?.role === 'reviewer';
-  const TABS = canViewLog ? [...TABS_BASE.slice(0, 3), LOG_TAB, TABS_BASE[3]] : TABS_BASE;
+  // Insert Log tab right before Settings (the last entry of TABS_BASE).
+  const TABS = canViewLog
+    ? [...TABS_BASE.slice(0, -1), LOG_TAB, TABS_BASE[TABS_BASE.length - 1]]
+    : TABS_BASE;
 
   useEffect(() => {
     if (project && tab === 'settings') {
       fetchMembers();
       fetchBudgetSummary();
     }
-    if (project && (tab === 'board' || tab === 'list')) fetchTasks();
+    if (project && (tab === 'board' || tab === 'list' || tab === 'timeline')) fetchTasks();
     if (project && tab === 'list' && listTrashView) fetchTrash();
     if (project && tab === 'log' && canViewLog) fetchLog();
   }, [project, tab, listTrashView, fetchMembers, fetchBudgetSummary, fetchTasks, fetchTrash, fetchLog, canViewLog]);
@@ -760,6 +768,71 @@ const ProjectDetail = () => {
           <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading dashboard…</span></div>}>
             <ProjectDashboard projectId={id} currency={form.budgetCurrency || 'USD'} />
           </Suspense>
+        ) : tab === 'timeline' ? (
+          <div className="timeline-panel">
+            <div className="gantt-toolbar">
+              <div className="toggle-group" role="group" aria-label="Bar position">
+                <button
+                  type="button"
+                  className={ganttBarMode === 'Earliest' ? 'active' : ''}
+                  onClick={() => setGanttBarMode('Earliest')}
+                >
+                  Earliest start
+                </button>
+                <button
+                  type="button"
+                  className={ganttBarMode === 'Latest' ? 'active' : ''}
+                  onClick={() => setGanttBarMode('Latest')}
+                >
+                  Latest start
+                </button>
+              </div>
+              <div className="toggle-group" role="group" aria-label="View granularity">
+                {['Day', 'Week', 'Month'].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={ganttGranularity === m ? 'active' : ''}
+                    onClick={() => setGanttGranularity(m)}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <div className="gantt-header-info">
+                {schedule ? (
+                  <>
+                    <span>
+                      Duration: <strong>{schedule.projectDuration}{unitLabel(schedule.timeUnit || 'day')}</strong>
+                    </span>
+                    <span>
+                      Critical: <strong>{schedule.criticalPath?.length || 0} tasks</strong>
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            {tasksLoading || !schedule ? (
+              <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading schedule…</span></div>
+            ) : (schedule?.tasks?.length || 0) === 0 ? (
+              <div className="gantt-empty">
+                No tasks with duration yet. Add tasks with <code>duration</code> &gt; 0 to see the Gantt.
+              </div>
+            ) : (
+              <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading Gantt…</span></div>}>
+                <ProjectGantt
+                  schedule={schedule}
+                  projectStart={project?.startDate || new Date()}
+                  viewMode={ganttBarMode}
+                  ganttViewMode={ganttGranularity}
+                  onTaskClick={(taskId) => {
+                    const t = tasks.find((x) => String(x._id || x.id) === String(taskId));
+                    if (t) handleOpenEditTask(t);
+                  }}
+                />
+              </Suspense>
+            )}
+          </div>
         ) : tab === 'list' ? (
           (() => {
             const sourceTasks = listTrashView ? trashTasks : tasks;

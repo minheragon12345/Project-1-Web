@@ -1,0 +1,131 @@
+.project-gantt-container {
+  width: 100%;
+  overflow-x: auto;
+  background-color: var(--surface-primary, #fff);
+  border: 1px solid var(--border-primary, #e5e7eb);
+  border-radius: 8px;
+  padding: 8px 0;
+}
+
+.project-gantt-container .gantt {
+  font-family: inherit;
+}
+
+/* Critical-path bars: red fill + red progress. */
+.gantt .bar-wrapper.gantt-critical .bar {
+  fill: #dc2626;
+}
+
+.gantt .bar-wrapper.gantt-critical .bar-progress {
+  fill: #fca5a5;
+}
+
+.gantt .bar-wrapper.gantt-critical .bar-label {
+  fill: #fff;
+  font-weight: 600;
+}
+
+/* Dark theme overrides */
+.dark-theme .project-gantt-container {
+  background-color: var(--surface-primary, #1f2937);
+  border-color: var(--border-primary, #374151);
+}
+
+.dark-theme .gantt .grid-header {
+  fill: #1f2937;
+  stroke: #374151;
+}
+
+.dark-theme .gantt .grid-row {
+  fill: #111827;
+}
+
+.dark-theme .gantt .grid-row:nth-child(even) {
+  fill: #1f2937;
+}
+
+.dark-theme .gantt .row-line {
+  stroke: #374151;
+}
+
+.dark-theme .gantt .tick {
+  stroke: #374151;
+}
+
+.dark-theme .gantt .lower-text,
+.dark-theme .gantt .upper-text {
+  fill: #d1d5db;
+}
+
+.dark-theme .gantt .bar {
+  fill: #4b5563;
+  stroke: #6b7280;
+}
+
+.dark-theme .gantt .bar-progress {
+  fill: #6366f1;
+}
+
+.dark-theme .gantt .bar-label {
+  fill: #f9fafb;
+}
+
+.dark-theme .gantt .bar-wrapper.gantt-critical .bar {
+  fill: #b91c1c;
+}
+
+.dark-theme .gantt .bar-wrapper.gantt-critical .bar-progress {
+  fill: #fca5a5;
+}
+
+.gantt-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.gantt-toolbar .toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--border-secondary, #d1d5db);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.gantt-toolbar .toggle-group button {
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.gantt-toolbar .toggle-group button.active {
+  background-color: var(--primary-accent);
+  color: #fff;
+}
+
+.gantt-toolbar .toggle-group button:not(.active):hover {
+  background-color: var(--surface-secondary);
+}
+
+.gantt-header-info {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.gantt-header-info strong {
+  color: var(--text-primary);
+}
+
+.gantt-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
