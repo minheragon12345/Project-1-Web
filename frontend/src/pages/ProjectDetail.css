@@ -925,6 +925,73 @@
   color: #c7d2fe;
 }
 
+.critical-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.slack-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.duration-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: #ecfeff;
+  color: #155e75;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.people-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: #f5f3ff;
+  color: #5b21b6;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.dark-theme .critical-chip {
+  background-color: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.dark-theme .slack-chip {
+  background-color: rgba(75, 85, 99, 0.3);
+  color: #d1d5db;
+}
+
+.dark-theme .duration-chip {
+  background-color: rgba(8, 145, 178, 0.18);
+  color: #a5f3fc;
+}
+
+.dark-theme .people-chip {
+  background-color: rgba(91, 33, 182, 0.25);
+  color: #ddd6fe;
+}
+
 .progress-locked-hint {
   font-size: 0.72rem;
   font-weight: 600;

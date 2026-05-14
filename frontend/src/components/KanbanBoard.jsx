@@ -53,7 +53,7 @@ function patchForColumn(targetCol, task) {
   }
 }
 
-function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day' }) {
+function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day', schedule = null }) {
   const id = String(task._id || task.id);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
@@ -106,6 +106,15 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day
       </div>
 
       <div className="kanban-card-meta">
+        {schedule?.isCritical ? (
+          <span className="kanban-chip critical" title="On critical path">
+            Critical
+          </span>
+        ) : schedule && schedule.totalSlack > 0 ? (
+          <span className="kanban-chip slack" title="Total slack">
+            slack: {schedule.totalSlack}{unitLabel(timeUnit)}
+          </span>
+        ) : null}
         {task.duration > 0 ? (
           <span className="kanban-chip" title="Duration">
             Dur: {task.duration}{unitLabel(timeUnit)}
@@ -158,7 +167,7 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day
   );
 }
 
-function KanbanColumn({ column, tasks, canEdit, onCardClick, isOver, timeUnit }) {
+function KanbanColumn({ column, tasks, canEdit, onCardClick, isOver, timeUnit, scheduleByTaskId }) {
   const { setNodeRef } = useDroppable({
     id: column.key,
     data: { type: 'column', columnKey: column.key },
@@ -185,6 +194,7 @@ function KanbanColumn({ column, tasks, canEdit, onCardClick, isOver, timeUnit })
               canEdit={canEdit}
               onClick={onCardClick}
               timeUnit={timeUnit}
+              schedule={scheduleByTaskId?.get(String(t._id || t.id)) || null}
             />
           ))
         )}
@@ -193,7 +203,7 @@ function KanbanColumn({ column, tasks, canEdit, onCardClick, isOver, timeUnit })
   );
 }
 
-export default function KanbanBoard({ tasks, canEdit, onTaskMove, onCardClick, timeUnit = 'day' }) {
+export default function KanbanBoard({ tasks, canEdit, onTaskMove, onCardClick, timeUnit = 'day', scheduleByTaskId = null }) {
   const [activeTask, setActiveTask] = useState(null);
   const [overColumn, setOverColumn] = useState(null);
 
@@ -279,12 +289,19 @@ export default function KanbanBoard({ tasks, canEdit, onTaskMove, onCardClick, t
             onCardClick={onCardClick}
             isOver={overColumn === col.key}
             timeUnit={timeUnit}
+            scheduleByTaskId={scheduleByTaskId}
           />
         ))}
       </div>
       <DragOverlay>
         {activeTask ? (
-          <KanbanCard task={activeTask} canEdit={false} isOverlay timeUnit={timeUnit} />
+          <KanbanCard
+            task={activeTask}
+            canEdit={false}
+            isOverlay
+            timeUnit={timeUnit}
+            schedule={scheduleByTaskId?.get(String(activeTask._id || activeTask.id)) || null}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>

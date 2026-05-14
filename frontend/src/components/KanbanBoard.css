@@ -185,6 +185,31 @@
   color: #c7d2fe;
 }
 
+.kanban-chip.critical {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.kanban-chip.slack {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.dark-theme .kanban-chip.critical {
+  background-color: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.dark-theme .kanban-chip.slack {
+  background-color: rgba(75, 85, 99, 0.3);
+  color: #d1d5db;
+}
+
 .kanban-card-meta .overdue-text {
   color: var(--danger-text);
   font-weight: 600;

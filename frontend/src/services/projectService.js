@@ -123,3 +123,13 @@ export const getProjectAuditLog = async (id, { limit = 200 } = {}) => {
     throw new Error(message);
   }
 };
+
+export const getProjectSchedule = async (id) => {
+  try {
+    const res = await API.get(`/projects/${id}/schedule`);
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not load schedule';
+    throw new Error(message);
+  }
+};

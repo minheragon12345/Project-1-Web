@@ -54,6 +54,7 @@ import TimeLogSection from '../components/TimeLogSection';
 import TaskRelationsSection from '../components/TaskRelationsSection';
 const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 import { useTheme } from '../hooks/useTheme';
+import { useSchedule } from '../hooks/useSchedule';
 import './ProjectDetail.css';
 
 const TIME_UNIT_SHORT = { hour: 'h', day: 'd', week: 'w', month: 'mo' };
@@ -109,6 +110,7 @@ const ProjectDetail = () => {
 
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
+  const { byTaskId: scheduleByTaskId, schedule, refresh: refreshSchedule } = useSchedule(id);
   const [listSearch, setListSearch] = useState('');
   const [listTrashView, setListTrashView] = useState(false);
   const [trashTasks, setTrashTasks] = useState([]);
@@ -246,6 +248,7 @@ const ProjectDetail = () => {
     try {
       const data = await getNotes('', 'all', { projectId: id });
       setTasks(Array.isArray(data?.notes) ? data.notes : []);
+      refreshSchedule?.();
     } catch (err) {
       toast.error(err.message || 'Failed to load tasks');
     } finally {
@@ -749,6 +752,7 @@ const ProjectDetail = () => {
                 onTaskMove={handleTaskMove}
                 onCardClick={handleOpenEditTask}
                 timeUnit={project?.timeUnit || 'day'}
+                scheduleByTaskId={scheduleByTaskId}
               />
             )}
           </div>
@@ -848,6 +852,25 @@ const ProjectDetail = () => {
                           {t.title || <span className="task-placeholder">(no title)</span>}
                         </div>
                         <div className="task-sub">
+                          {(() => {
+                            const sched = scheduleByTaskId.get(String(t._id || t.id));
+                            if (!sched) return null;
+                            if (sched.isCritical) {
+                              return (
+                                <span className="critical-chip" title="On critical path">
+                                  Critical
+                                </span>
+                              );
+                            }
+                            if (sched.totalSlack > 0) {
+                              return (
+                                <span className="slack-chip" title="Total slack">
+                                  slack: {sched.totalSlack}{unitLabel(project?.timeUnit || 'day')}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                           {t.duration > 0 ? (
                             <span className="duration-chip" title="Duration">
                               Dur: {t.duration}{unitLabel(project?.timeUnit || 'day')}

@@ -7,6 +7,7 @@ const TimeEntry = require('../models/timeEntryModel');
 const AuditLog = require('../models/auditLogModel');
 const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
+const { computeSchedule } = require('../services/scheduler');
 
 const router = express.Router();
 const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
@@ -804,6 +805,72 @@ router.get('/:id/audit-log', async (req, res) => {
     }));
 
     return res.json({ total: items.length, items });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// CPM schedule: forward/backward pass over the project's dependency graph.
+// Returns earliest/latest dates, slacks, and the critical path.
+router.get('/:id/schedule', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
+
+    const project = await Project.findOne({ _id: id, isDeleted: false })
+      .select('owner members isDeleted timeUnit');
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canRead(project, req.userId)) return res.status(403).json({ message: 'Forbidden' });
+
+    const tasksRaw = await Note.find({ project: id, isDeleted: false })
+      .select('_id title duration dependencies status actualStart actualEnd peopleRequired')
+      .lean();
+
+    const tasksForScheduler = tasksRaw.map((t) => ({
+      id: String(t._id),
+      duration: Number(t.duration) || 0,
+      dependencies: (t.dependencies || []).map((d) => String(d)),
+    }));
+
+    let schedule;
+    try {
+      schedule = computeSchedule(tasksForScheduler);
+    } catch (err) {
+      if (/cycle/i.test(err.message)) {
+        return res.status(400).json({ message: 'Cycle detected in dependency graph' });
+      }
+      throw err;
+    }
+
+    const tasks = tasksRaw.map((t) => {
+      const sid = String(t._id);
+      const s = schedule.slacks.get(sid);
+      return {
+        id: sid,
+        title: t.title || '',
+        duration: Number(t.duration) || 0,
+        peopleRequired: Number(t.peopleRequired) || 1,
+        dependencies: (t.dependencies || []).map((d) => String(d)),
+        status: t.status,
+        actualStart: t.actualStart || null,
+        actualEnd: t.actualEnd || null,
+        ES: s?.ES ?? 0,
+        EF: s?.EF ?? 0,
+        LS: s?.LS ?? 0,
+        LF: s?.LF ?? 0,
+        totalSlack: s?.totalSlack ?? 0,
+        freeSlack: s?.freeSlack ?? 0,
+        isCritical: !!s?.isCritical,
+      };
+    });
+
+    return res.json({
+      projectDuration: schedule.projectDuration,
+      timeUnit: project.timeUnit || 'day',
+      criticalPath: schedule.criticalPath,
+      tasks,
+    });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }
