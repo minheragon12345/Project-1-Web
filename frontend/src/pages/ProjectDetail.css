@@ -283,6 +283,7 @@
 
 .settings-form,
 .members-section,
+.advanced-tools,
 .danger-zone {
   background-color: var(--surface-primary);
   border: 1px solid var(--border-primary);
@@ -292,9 +293,23 @@
 
 .settings-form h3,
 .members-section h3,
+.advanced-tools h3,
 .danger-zone h3 {
   margin: 0 0 1rem 0;
   font-size: 1rem;
+}
+
+.advanced-tools p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+}
+
+.advanced-tools code {
+  background-color: var(--surface-secondary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.78rem;
 }
 
 .settings-form label,

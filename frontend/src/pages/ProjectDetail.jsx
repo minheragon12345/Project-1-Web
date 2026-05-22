@@ -1392,6 +1392,24 @@ const ProjectDetail = () => {
               ) : null}
             </div>
 
+            <div className="advanced-tools">
+              <h3>Advanced</h3>
+              <p>
+                Crashing analysis runs the §3 heuristic over critical tasks with{' '}
+                <code>minDuration</code> and <code>marginalCost</code> set. Requires{' '}
+                <code>project.lostRevenuePerUnit</code>.
+              </p>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => navigate(`/projects/${id}/optimize`)}
+                disabled={project.lostRevenuePerUnit == null}
+                title={project.lostRevenuePerUnit == null ? 'Set lostRevenuePerUnit to enable' : ''}
+              >
+                Show optimization
+              </button>
+            </div>
+
             {isOwner && !project.isPersonal ? (
               <div className="danger-zone">
                 <h3>Danger zone</h3>

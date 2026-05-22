@@ -144,3 +144,13 @@ export const getResourceCurve = async (id) => {
     throw new Error(message);
   }
 };
+
+export const getCrashAnalysis = async (id) => {
+  try {
+    const res = await API.get(`/projects/${id}/crash-analysis`);
+    return res.data;
+  } catch (error) {
+    const message = error.response?.data?.message || 'Could not load crashing analysis';
+    throw new Error(message);
+  }
+};

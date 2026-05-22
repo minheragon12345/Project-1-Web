@@ -9,6 +9,7 @@ const auth = require('../middleware/authMiddleware');
 const { writeAudit } = require('../utils/audit');
 const { computeSchedule, computeResourceCurve } = require('../services/scheduler');
 const { serialSchedule } = require('../services/serialScheduler');
+const { computeCrashingTable } = require('../services/crashing');
 
 const router = express.Router();
 const MEMBER_ROLES = Project.MEMBER_ROLES || ['owner', 'moderator', 'editor', 'reviewer', 'viewer'];
@@ -973,6 +974,74 @@ router.get('/:id/resource-curve', async (req, res) => {
       reference,
       timeUnit: project.timeUnit || 'day',
       projectDuration: schedule.projectDuration,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Crashing analysis (§3 of the study guide). Iteratively reduces critical-path
+// tasks by 1 unit, lowest marginalCost first, recomputes the schedule each
+// step. Reports the synthesis table with the totalCost-minimizing row flagged.
+//
+// Requires project.lostRevenuePerUnit to be set; treats lostRev(d) = perUnit*d
+// as the simplest linear interpretation of §3.6's lost-revenue table.
+router.get('/:id/crash-analysis', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
+
+    const project = await Project.findOne({ _id: id, isDeleted: false })
+      .select('owner members isDeleted timeUnit lostRevenuePerUnit');
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canRead(project, req.userId)) return res.status(403).json({ message: 'Forbidden' });
+
+    if (project.lostRevenuePerUnit == null) {
+      return res.status(400).json({ message: 'project.lostRevenuePerUnit is not set; cannot run crashing analysis' });
+    }
+    const perUnit = Number(project.lostRevenuePerUnit);
+    if (!Number.isFinite(perUnit) || perUnit < 0) {
+      return res.status(400).json({ message: 'project.lostRevenuePerUnit must be >= 0' });
+    }
+
+    const tasksRaw = await Note.find({ project: id, isDeleted: false })
+      .select('_id title duration dependencies minDuration marginalCost')
+      .lean();
+
+    const tasksForCrash = tasksRaw.map((t) => ({
+      id: String(t._id),
+      duration: Number(t.duration) || 0,
+      minDuration: t.minDuration == null ? null : Number(t.minDuration),
+      marginalCost: t.marginalCost == null ? null : Number(t.marginalCost),
+      dependencies: (t.dependencies || []).map((d) => String(d)),
+    }));
+
+    let result;
+    try {
+      result = computeCrashingTable(tasksForCrash, (d) => perUnit * d);
+    } catch (err) {
+      if (/cycle/i.test(err.message)) {
+        return res.status(400).json({ message: 'Cycle detected in dependency graph' });
+      }
+      throw err;
+    }
+
+    // Decorate steps with task titles for the frontend table.
+    const titleById = new Map(tasksRaw.map((t) => [String(t._id), t.title || '']));
+    const steps = result.steps.map((s) => ({
+      from: s.from,
+      to: s.to,
+      cost: s.cost,
+      tasks: s.taskIds.map((tid) => ({ id: tid, title: titleById.get(tid) || '' })),
+    }));
+
+    return res.json({
+      timeUnit: project.timeUnit || 'day',
+      lostRevenuePerUnit: perUnit,
+      rows: result.rows,
+      optimalIndex: result.optimalIndex,
+      steps,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });

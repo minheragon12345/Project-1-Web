@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
+import ProjectOptimize from './pages/ProjectOptimize';
 import MyTime from './pages/MyTime';
 import Reports from './pages/Reports';
 import { me } from './services/authService';
@@ -71,6 +72,10 @@ function App() {
         <Route
           path="/projects/:id"
           element={isAuthenticated ? <ProjectDetail /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/projects/:id/optimize"
+          element={isAuthenticated ? <ProjectOptimize /> : <Navigate to="/login" />}
         />
         <Route
           path="/my-time"
