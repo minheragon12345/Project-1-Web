@@ -1,16 +1,3 @@
-/*
-  Usage:
-    node scripts/migrateToPMTheory.js              # dry run
-    node scripts/migrateToPMTheory.js --apply      # actually write
-
-  Phase 3 (PM Theory Alignment) migration. Idempotent.
-    1. Ensure every Project has timeUnit (default 'day').
-    2. Backfill Note.duration from estimatedHours, converted to project's timeUnit.
-    3. Backfill Note.actualEnd from updatedAt where status === 'done' and actualEnd is null.
-    4. Backfill Note.actualStart from updatedAt - progress%*duration where status !== 'done'
-       and progress > 0 and actualStart is null. Rough but recoverable.
-*/
-
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -49,7 +36,6 @@ async function main() {
     console.log(`  -> set timeUnit on ${r.modifiedCount} projects`);
   }
 
-  // Build project -> timeUnit map (after potential apply)
   const projects = await Project.find({}).select('_id timeUnit').lean();
   const unitByProject = new Map(
     projects.map((p) => [String(p._id), p.timeUnit || 'day']),

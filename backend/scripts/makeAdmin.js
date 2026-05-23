@@ -1,10 +1,3 @@
-/*
-  Usage:
-    node scripts/makeAdmin.js user@example.com
-
-  This will set the user's role to 'admin'.
-*/
-
 const dotenv = require('dotenv');
 dotenv.config();
 

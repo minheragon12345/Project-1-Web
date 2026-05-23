@@ -1,13 +1,3 @@
-/*
-  Usage:
-    node scripts/backfillPersonalProjects.js              # dry run
-    node scripts/backfillPersonalProjects.js --apply      # actually write
-
-  For every user, ensure a "Personal" project exists (isPersonal: true),
-  and set Note.project on all of that user's notes (where project is null)
-  to the user's personal project. Idempotent, safe to run multiple times.
-*/
-
 const dotenv = require('dotenv');
 dotenv.config();
 

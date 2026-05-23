@@ -16,8 +16,6 @@ const TimeEntrySchema = new mongoose.Schema(
       index: true,
     },
 
-    // Denormalized from task for cheap project-scoped queries.
-    // Always set to task.project at the time the entry is created/updated.
     project: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Project',

@@ -1779,7 +1779,7 @@ const ProjectDetail = () => {
               <div className="form-row">
                 <div className="form-group half">
                   <label title="Floor for crashing analysis (§3). Leave empty to mark task as non-crashable.">
-                    Min duration ({unitLabel(project?.timeUnit || 'day')}) — optional
+                    Min duration ({unitLabel(project?.timeUnit || 'day')}) - optional
                   </label>
                   <input
                     type="number"
@@ -1795,7 +1795,7 @@ const ProjectDetail = () => {
 
                 <div className="form-group half">
                   <label title="Cost per unit of crash. Used by crashing analysis (§3) to pick cheapest task to shorten.">
-                    Marginal cost / unit — optional
+                    Marginal cost / unit - optional
                   </label>
                   <input
                     type="number"
