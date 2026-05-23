@@ -68,13 +68,22 @@ export default function ProjectGantt({
 
     return schedule.tasks.map((t) => {
       const startOffset = useLatest ? t.LS : t.ES;
-      const endOffset = startOffset + (Number(t.duration) || 0);
+      const dur = Number(t.duration) || 0;
+      const endOffset = startOffset + dur;
       const startDate = addUnits(origin, startOffset, unit);
-      // frappe-gantt v1.2.x treats `end` as the day AFTER the last day for Day mode.
-      // Add 1 day so a 1-day task renders as a single bar, not a hairline.
-      const endDate = endOffset === startOffset
-        ? addUnits(startDate, 1, 'day')
-        : addUnits(origin, endOffset, unit);
+      // frappe-gantt v1.2.x treats `end` as the INCLUSIVE last day of the bar
+      // in Day view: a task with start=2026-05-23 and end=2026-05-26 fills
+      // 4 cells (23, 24, 25, 26). So we point `end` at the last working unit:
+      //   startOffset + duration − 1 unit
+      // and then back off by 1 day to make sure cross-unit math still lands
+      // on the right rendered cell. For 0-duration tasks we collapse end to
+      // start so frappe-gantt draws a single-cell bar.
+      let endDate;
+      if (dur <= 0) {
+        endDate = startDate;
+      } else {
+        endDate = new Date(addUnits(origin, endOffset, unit).getTime() - MS_PER_DAY);
+      }
 
       return {
         id: String(t.id),
