@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../services/authService';
 import { toast } from 'react-toastify';
+import { useI18n } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import './Login.css';
 
 const Login = () => {
+  const { t } = useI18n();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -21,7 +24,7 @@ const Login = () => {
         toast.error(msg);
       }
     } catch {
-
+      // ignore
     }
   }, []);
 
@@ -44,10 +47,10 @@ const Login = () => {
       }
 
       window.dispatchEvent(new Event('authChange'));
-      toast.success('Signed in successfully!');
+      toast.success(t('auth.signInToast'));
       navigate('/');
     } catch (err) {
-      toast.error(err.message || 'Sign in failed');
+      toast.error(err.message || t('auth.signInFailed'));
     } finally {
       setLoading(false);
     }
@@ -55,37 +58,40 @@ const Login = () => {
 
   return (
     <div className="auth-wrapper">
+      <div style={{ position: 'absolute', top: 16, right: 16 }}>
+        <LanguageSwitcher />
+      </div>
       <div className="auth-card">
-        <h2>Sign In</h2>
+        <h2>{t('auth.signIn')}</h2>
         <form onSubmit={onSubmit}>
           <div className="form-group">
-            <label>Email</label>
+            <label>{t('auth.email')}</label>
             <input
               type="email"
               name="email"
               value={email}
               onChange={onChange}
-              placeholder="Enter your email"
+              placeholder={t('auth.emailPlaceholder')}
               required
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <label>{t('auth.password')}</label>
             <input
               type="password"
               name="password"
               value={password}
               onChange={onChange}
-              placeholder="Enter your password"
+              placeholder={t('auth.passwordPlaceholder')}
               required
             />
           </div>
           <button type="submit" className="btn-auth" disabled={loading}>
-            {loading ? 'Processing…' : 'Sign In'}
+            {loading ? t('common.processing') : t('auth.signIn')}
           </button>
         </form>
         <p className="auth-footer">
-          Don't have an account? <Link to="/register">Sign up now</Link>
+          {t('auth.noAccount')} <Link to="/register">{t('auth.signUpNow')}</Link>
         </p>
       </div>
     </div>

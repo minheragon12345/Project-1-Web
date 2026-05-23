@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { listTimeEntries, deleteTimeEntry } from '../services/timeEntryService';
 import { useTheme } from '../hooks/useTheme';
+import { useI18n } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import './MyTime.css';
 
 function startOfWeek(date) {
@@ -50,6 +52,7 @@ function dayLabel(date) {
 
 const MyTime = () => {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
@@ -114,14 +117,14 @@ const MyTime = () => {
   );
 
   const handleDelete = async (entry) => {
-    if (!window.confirm(`Delete this ${entry.hours}h entry?`)) return;
+    if (!window.confirm(t('mytime.deleteConfirm', { hours: entry.hours }))) return;
     setPendingId(entry.id);
     try {
       await deleteTimeEntry(entry.id);
-      toast.success('Entry deleted');
+      toast.success(t('mytime.deleted'));
       fetchWeek();
     } catch (err) {
-      toast.error(err.message || 'Could not delete');
+      toast.error(err.message || t('mytime.deleteFailed'));
     } finally {
       setPendingId(null);
     }
@@ -137,18 +140,17 @@ const MyTime = () => {
         <div className="mytime-title">
           <Clock size={22} />
           <div>
-            <h2>My Time</h2>
+            <h2>{t('mytime.heading')}</h2>
             <p>
-              {currentUser ? (
-                <>Hours logged for <strong>{currentUser.username}</strong></>
-              ) : (
-                'Weekly time tracking'
-              )}
+              {currentUser
+                ? t('mytime.sub', { name: currentUser.username })
+                : t('mytime.subGuest')}
             </p>
           </div>
         </div>
 
         <div className="mytime-actions">
+          <LanguageSwitcher />
           <button className="btn" onClick={cycleTheme} title={`Theme: ${themePref}`}>
             {themePref === 'light' ? (
               <Sun size={18} />
@@ -162,7 +164,7 @@ const MyTime = () => {
             className="btn"
             onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
           >
-            <ArrowLeft size={18} /> Back
+            <ArrowLeft size={18} /> {t('common.back')}
           </button>
           <button
             className="btn"
@@ -172,32 +174,32 @@ const MyTime = () => {
               window.dispatchEvent(new Event('authChange'));
               navigate('/login');
             }}
-            title="Sign out"
+            title={t('common.signOut')}
           >
-            <LogOut size={18} /> Logout
+            <LogOut size={18} /> {t('common.logout')}
           </button>
         </div>
       </div>
 
       <div className="mytime-week-bar">
-        <button className="btn" onClick={goPrev} title="Previous week">
+        <button className="btn" onClick={goPrev} title={t('mytime.prevWeek')}>
           <ChevronLeft size={18} />
         </button>
         <div className="mytime-week-label">
           <CalendarDays size={16} />
           <span>{formatRange(weekStart)}</span>
         </div>
-        <button className="btn" onClick={goNext} title="Next week">
+        <button className="btn" onClick={goNext} title={t('mytime.nextWeek')}>
           <ChevronRight size={18} />
         </button>
-        <button className="btn" onClick={goToday}>This week</button>
+        <button className="btn" onClick={goToday}>{t('mytime.thisWeek')}</button>
 
         <div className="mytime-week-totals">
           <span className="mytime-stat">
-            Total: <strong>{totalHours.toFixed(2)}h</strong>
+            {t('mytime.total')} <strong>{totalHours.toFixed(2)}h</strong>
           </span>
           <span className="mytime-stat">
-            Billable: <strong>{billableTotal.toFixed(2)}h</strong>
+            {t('mytime.billable')} <strong>{billableTotal.toFixed(2)}h</strong>
           </span>
         </div>
       </div>
@@ -205,7 +207,7 @@ const MyTime = () => {
       {loading ? (
         <div className="mytime-loading">
           <Loader className="spin" size={28} />
-          <span>Loading…</span>
+          <span>{t('common.loading')}</span>
         </div>
       ) : (
         <div className="mytime-days">
@@ -222,7 +224,7 @@ const MyTime = () => {
               </div>
               <div className="mytime-day-body">
                 {day.entries.length === 0 ? (
-                  <div className="mytime-day-empty">No entries</div>
+                  <div className="mytime-day-empty">{t('mytime.noEntries')}</div>
                 ) : (
                   day.entries.map((e) => {
                     const pending = pendingId === e.id;
@@ -231,9 +233,9 @@ const MyTime = () => {
                         <span className="mytime-entry-hours">{Number(e.hours).toFixed(2)}h</span>
                         <div className="mytime-entry-body">
                           <div className="mytime-entry-task">
-                            {e.task?.title || e.task?.content?.slice(0, 80) || 'Task'}
+                            {e.task?.title || e.task?.content?.slice(0, 80) || t('nav.tasks')}
                             {e.project?.name ? (
-                              <span className="mytime-entry-project">in {e.project.name}</span>
+                              <span className="mytime-entry-project">{t('mytime.inProject', { name: e.project.name })}</span>
                             ) : null}
                           </div>
                           {e.description ? (
@@ -241,16 +243,16 @@ const MyTime = () => {
                           ) : null}
                         </div>
                         {e.billable ? (
-                          <span className="mytime-chip billable">Billable</span>
+                          <span className="mytime-chip billable">{t('mytime.billableChip')}</span>
                         ) : (
-                          <span className="mytime-chip">Non-billable</span>
+                          <span className="mytime-chip">{t('mytime.nonBillableChip')}</span>
                         )}
                         <button
                           type="button"
                           className="icon-btn danger"
                           onClick={() => handleDelete(e)}
                           disabled={pending}
-                          title="Delete entry"
+                          title={t('mytime.deleteTitle')}
                         >
                           {pending ? <Loader size={14} className="spin" /> : <Trash2 size={14} />}
                         </button>

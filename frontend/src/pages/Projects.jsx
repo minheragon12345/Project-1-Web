@@ -24,22 +24,24 @@ import {
   deleteProject,
 } from '../services/projectService';
 import { useTheme } from '../hooks/useTheme';
+import { useI18n } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import './Projects.css';
 
 const SCOPE_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'Mine' },
-  { value: 'shared', label: 'Shared' },
+  { value: 'all', i18n: 'projects.scope.all' },
+  { value: 'mine', i18n: 'projects.scope.mine' },
+  { value: 'shared', i18n: 'projects.scope.shared' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'archived', label: 'Archived' },
+  { value: 'active', i18n: 'projects.status.active' },
+  { value: 'archived', i18n: 'projects.status.archived' },
 ];
 
 const BUDGET_TYPES = [
-  { value: 'hourly', label: 'Hourly' },
-  { value: 'fixed', label: 'Fixed' },
+  { value: 'hourly', i18n: 'settings.budgetType.hourly' },
+  { value: 'fixed', i18n: 'settings.budgetType.fixed' },
 ];
 
 const INITIAL_FORM = {
@@ -54,6 +56,7 @@ const INITIAL_FORM = {
 
 const Projects = () => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +85,7 @@ const Projects = () => {
       const data = await getProjects({ search, scope, status: statusFilter });
       setProjects(Array.isArray(data?.projects) ? data.projects : []);
     } catch (err) {
-      toast.error(err.message || 'Failed to load projects');
+      toast.error(err.message || t('projects.loading'));
     } finally {
       setLoading(false);
     }
@@ -110,7 +113,7 @@ const Projects = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error('Project name cannot be empty');
+      toast.error(t('projects.nameRequired'));
       return;
     }
     setSaving(true);
@@ -126,11 +129,11 @@ const Projects = () => {
           type: form.budgetType || 'hourly',
         },
       });
-      toast.success('Project created');
+      toast.success(t('projects.created'));
       setShowModal(false);
       fetchProjects();
     } catch (err) {
-      toast.error(err.message || 'Failed to create project');
+      toast.error(err.message || t('projects.created'));
     } finally {
       setSaving(false);
     }
@@ -139,7 +142,7 @@ const Projects = () => {
   const handleArchive = async (project) => {
     try {
       await archiveProject(project.id);
-      toast.success(project.status === 'archived' ? 'Project restored' : 'Project archived');
+      toast.success(project.status === 'archived' ? t('projects.restored') : t('projects.archived'));
       fetchProjects();
     } catch (err) {
       toast.error(err.message || 'Error');
@@ -147,13 +150,13 @@ const Projects = () => {
   };
 
   const handleDelete = async (project) => {
-    if (!window.confirm(`Delete project "${project.name}"? This action cannot be undone.`)) return;
+    if (!window.confirm(t('projects.deleteConfirm', { name: project.name }))) return;
     try {
       await deleteProject(project.id);
-      toast.success('Project deleted');
+      toast.success(t('projects.deleted'));
       fetchProjects();
     } catch (err) {
-      toast.error(err.message || 'Failed to delete project');
+      toast.error(err.message || t('projects.deleted'));
     }
   };
 
@@ -165,10 +168,10 @@ const Projects = () => {
         <div className="header-top-row">
           <h2>
             <FolderKanban size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-            Projects
+            {t('projects.heading')}
           </h2>
           <div className="user-greeting">
-            Hi, <strong style={{ marginLeft: 4 }}>{user?.username || 'there'}</strong>
+            {t('nav.greeting', { name: user?.username || t('nav.guest') })}
           </div>
         </div>
 
@@ -177,7 +180,7 @@ const Projects = () => {
             <Search size={18} />
             <input
               type="text"
-              placeholder="Search projects…"
+              placeholder={t('projects.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchProjects()}
@@ -187,24 +190,24 @@ const Projects = () => {
           <button
             className="btn-admin nav-btn"
             onClick={() => navigate('/my-time')}
-            title="My Time"
+            title={t('projects.myTime')}
           >
-            <Clock size={20} /> My Time
+            <Clock size={20} /> {t('projects.myTime')}
           </button>
 
           <button
             className="btn-admin nav-btn"
             onClick={() => navigate('/reports')}
-            title="Reports"
+            title={t('projects.reports')}
           >
-            <FileText size={20} /> Reports
+            <FileText size={20} /> {t('projects.reports')}
           </button>
 
           <div className="filter-group">
             <select value={scope} onChange={(e) => setScope(e.target.value)}>
               {SCOPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}
+                  {t(o.i18n)}
                 </option>
               ))}
             </select>
@@ -212,13 +215,14 @@ const Projects = () => {
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               {STATUS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}
+                  {t(o.i18n)}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="action-buttons">
+            <LanguageSwitcher />
             <button className="btn-secondary" onClick={toggleTheme} title={`Theme: ${themePref}`}>
               {themePref === 'light' ? (
                 <Sun size={18} />
@@ -230,7 +234,7 @@ const Projects = () => {
             </button>
             <button className="btn-primary" onClick={handleOpenCreate}>
               <Plus size={18} />
-              <span>New project</span>
+              <span>{t('projects.newProject')}</span>
             </button>
             <button
               className="btn-secondary"
@@ -240,10 +244,10 @@ const Projects = () => {
                 window.dispatchEvent(new Event('authChange'));
                 navigate('/login');
               }}
-              title="Sign out"
+              title={t('common.signOut')}
             >
               <LogOut size={18} />
-              <span>Logout</span>
+              <span>{t('common.logout')}</span>
             </button>
           </div>
         </div>
@@ -252,12 +256,12 @@ const Projects = () => {
       {loading ? (
         <div className="projects-loading">
           <Loader className="spin" size={28} />
-          <span>Loading projects…</span>
+          <span>{t('projects.loading')}</span>
         </div>
       ) : projects.length === 0 ? (
         <div className="projects-empty">
           <FolderKanban size={40} />
-          <p>No projects yet. Click "New project" to create the first one.</p>
+          <p>{t('projects.empty')}</p>
         </div>
       ) : (
         <div className="projects-grid">
@@ -293,22 +297,22 @@ const Projects = () => {
                     {p.budget.currency} {Number(p.budget.amount).toLocaleString()}
                   </span>
                 ) : null}
-                {p.isPersonal ? <span className="badge-personal">Personal</span> : null}
-                {p.status === 'archived' ? <span className="badge-archived">Archived</span> : null}
+                {p.isPersonal ? <span className="badge-personal">{t('projects.badge.personal')}</span> : null}
+                {p.status === 'archived' ? <span className="badge-archived">{t('projects.badge.archived')}</span> : null}
               </div>
 
               {p.role === 'owner' && !p.isPersonal ? (
                 <div className="project-card-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     className="icon-btn"
-                    title={p.status === 'archived' ? 'Restore' : 'Archive'}
+                    title={p.status === 'archived' ? t('common.restore') : t('common.archive')}
                     onClick={() => handleArchive(p)}
                   >
                     <Archive size={16} />
                   </button>
                   <button
                     className="icon-btn danger"
-                    title="Delete project"
+                    title={t('common.delete')}
                     onClick={() => handleDelete(p)}
                   >
                     <Trash2 size={16} />
@@ -324,30 +328,30 @@ const Projects = () => {
         <div className="modal-backdrop" onClick={handleCloseModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>New project</h3>
-              <button className="icon-btn" onClick={handleCloseModal} title="Close">
+              <h3>{t('projects.modal.title')}</h3>
+              <button className="icon-btn" onClick={handleCloseModal} title={t('common.close')}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleCreate} className="modal-form">
               <label>
-                <span>Project name *</span>
+                <span>{t('projects.modal.name')}</span>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. Redesign Landing Page"
+                  placeholder={t('projects.modal.namePlaceholder')}
                   maxLength={120}
                   autoFocus
                 />
               </label>
 
               <label>
-                <span>Description</span>
+                <span>{t('projects.modal.description')}</span>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Goals, scope, notes…"
+                  placeholder={t('projects.modal.descPlaceholder')}
                   rows={3}
                   maxLength={2000}
                 />
@@ -355,7 +359,7 @@ const Projects = () => {
 
               <div className="form-row">
                 <label>
-                  <span>Start date</span>
+                  <span>{t('settings.startDate')}</span>
                   <input
                     type="date"
                     value={form.startDate}
@@ -363,7 +367,7 @@ const Projects = () => {
                   />
                 </label>
                 <label>
-                  <span>End date</span>
+                  <span>{t('settings.endDate')}</span>
                   <input
                     type="date"
                     value={form.endDate}
@@ -374,7 +378,7 @@ const Projects = () => {
 
               <div className="form-row">
                 <label>
-                  <span>Budget</span>
+                  <span>{t('settings.budget')}</span>
                   <input
                     type="number"
                     min="0"
@@ -384,7 +388,7 @@ const Projects = () => {
                   />
                 </label>
                 <label>
-                  <span>Currency</span>
+                  <span>{t('settings.currency')}</span>
                   <input
                     type="text"
                     maxLength={8}
@@ -395,14 +399,14 @@ const Projects = () => {
                   />
                 </label>
                 <label>
-                  <span>Type</span>
+                  <span>{t('settings.budgetType')}</span>
                   <select
                     value={form.budgetType}
                     onChange={(e) => setForm({ ...form, budgetType: e.target.value })}
                   >
                     {BUDGET_TYPES.map((o) => (
                       <option key={o.value} value={o.value}>
-                        {o.label}
+                        {t(o.i18n)}
                       </option>
                     ))}
                   </select>
@@ -416,11 +420,11 @@ const Projects = () => {
                   onClick={handleCloseModal}
                   disabled={saving}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn-primary" disabled={saving}>
                   {saving ? <Loader size={16} className="spin" /> : <Plus size={16} />}
-                  <span>{saving ? 'Creating…' : 'Create project'}</span>
+                  <span>{saving ? t('common.creating') : t('projects.modal.create')}</span>
                 </button>
               </div>
             </form>

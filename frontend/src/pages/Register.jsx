@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../services/authService';
 import { toast } from 'react-toastify';
+import { useI18n } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import './Register.css';
 
 const Register = () => {
+  const { t } = useI18n();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -23,18 +26,18 @@ const Register = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      return toast.error('Passwords do not match!');
+      return toast.error(t('auth.passwordMismatch'));
     }
 
     setLoading(true);
     try {
       await register(username, email, password);
 
-      toast.success('Account created successfully! Please sign in.');
+      toast.success(t('auth.signUpToast'));
 
       navigate('/login');
     } catch (err) {
-      toast.error(err.message || 'Sign up failed');
+      toast.error(err.message || t('auth.signUpFailed'));
     } finally {
       setLoading(false);
     }
@@ -42,22 +45,25 @@ const Register = () => {
 
   return (
     <div className="auth-wrapper">
+      <div style={{ position: 'absolute', top: 16, right: 16 }}>
+        <LanguageSwitcher />
+      </div>
       <div className="auth-card">
-        <h2>Create Account</h2>
+        <h2>{t('auth.createAccount')}</h2>
         <form onSubmit={onSubmit}>
           <div className="form-group">
-            <label>Username</label>
+            <label>{t('auth.username')}</label>
             <input
               type="text"
               name="username"
               value={username}
               onChange={onChange}
-              placeholder="e.g. HoangAn123"
+              placeholder={t('auth.usernamePlaceholder')}
               required
             />
           </div>
           <div className="form-group">
-            <label>Email</label>
+            <label>{t('auth.email')}</label>
             <input
               type="email"
               name="email"
@@ -68,33 +74,33 @@ const Register = () => {
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <label>{t('auth.password')}</label>
             <input
               type="password"
               name="password"
               value={password}
               onChange={onChange}
-              placeholder="At least 6 characters"
+              placeholder={t('auth.passwordHint')}
               required
             />
           </div>
           <div className="form-group">
-            <label>Confirm password</label>
+            <label>{t('auth.confirmPassword')}</label>
             <input
               type="password"
               name="confirmPassword"
               value={confirmPassword}
               onChange={onChange}
-              placeholder="Re-enter your password"
+              placeholder={t('auth.confirmPlaceholder')}
               required
             />
           </div>
           <button type="submit" className="btn-auth" disabled={loading}>
-            {loading ? 'Processing…' : 'Sign Up'}
+            {loading ? t('common.processing') : t('auth.signUp')}
           </button>
         </form>
         <p className="auth-footer">
-          Already have an account? <Link to="/login">Sign in now</Link>
+          {t('auth.hasAccount')} <Link to="/login">{t('auth.signInNow')}</Link>
         </p>
       </div>
     </div>

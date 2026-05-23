@@ -15,6 +15,8 @@ import {
 import { getProjects, getProject } from '../services/projectService';
 import { listTimeEntries } from '../services/timeEntryService';
 import { useTheme } from '../hooks/useTheme';
+import { useI18n } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import './Reports.css';
 
 function toISODate(d) {
@@ -32,7 +34,7 @@ function startOfMonth(d = new Date()) {
 
 function downloadCsv(filename, rows) {
   if (!rows || rows.length === 0) {
-    toast.info('Nothing to export');
+    toast.info('Nothing to export'); // toast is outside React tree; keep static
     return;
   }
   const headers = Object.keys(rows[0]);
@@ -59,6 +61,7 @@ function downloadCsv(filename, rows) {
 
 const Reports = () => {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { pref: themePref, resolved: theme, cycle: cycleTheme } = useTheme();
 
   const [projects, setProjects] = useState([]);
@@ -240,12 +243,13 @@ const Reports = () => {
         <div className="reports-title">
           <FileText size={22} />
           <div>
-            <h2>Reports</h2>
-            <p>Hours and cost breakdowns per project</p>
+            <h2>{t('reports.heading')}</h2>
+            <p>{t('reports.sub')}</p>
           </div>
         </div>
 
         <div className="reports-actions">
+          <LanguageSwitcher />
           <button className="btn" onClick={cycleTheme} title={`Theme: ${themePref}`}>
             {themePref === 'light' ? (
               <Sun size={18} />
@@ -259,7 +263,7 @@ const Reports = () => {
             className="btn"
             onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
           >
-            <ArrowLeft size={18} /> Back
+            <ArrowLeft size={18} /> {t('common.back')}
           </button>
           <button
             className="btn"
@@ -269,90 +273,93 @@ const Reports = () => {
               window.dispatchEvent(new Event('authChange'));
               navigate('/login');
             }}
-            title="Sign out"
+            title={t('common.signOut')}
           >
-            <LogOut size={18} /> Logout
+            <LogOut size={18} /> {t('common.logout')}
           </button>
         </div>
       </div>
 
       <div className="reports-filters">
         <label>
-          <span>Project</span>
+          <span>{t('reports.filter.project')}</span>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            {projects.length === 0 ? <option value="">No projects</option> : null}
+            {projects.length === 0 ? <option value="">{t('reports.noProjectsOption')}</option> : null}
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}{p.isPersonal ? ' (Personal)' : ''}
+                {p.name}{p.isPersonal ? ` (${t('projects.badge.personal')})` : ''}
               </option>
             ))}
           </select>
         </label>
         <label>
-          <span>From</span>
+          <span>{t('reports.filter.from')}</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         </label>
         <label>
-          <span>To</span>
+          <span>{t('reports.filter.to')}</span>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <button className="btn" onClick={fetchData} disabled={loading || !projectId}>
           {loading ? <Loader size={14} className="spin" /> : <RefreshCcw size={14} />}
-          <span>{loading ? 'Loading…' : 'Refresh'}</span>
+          <span>{loading ? t('common.loading') : t('common.refresh')}</span>
         </button>
       </div>
 
       {projects.length === 0 ? (
         <div className="reports-empty-state">
           <FileText size={40} />
-          <p>No projects yet. Create a project before running reports.</p>
+          <p>{t('reports.empty')}</p>
         </div>
       ) : null}
 
       <div className="reports-totals">
         <div className="reports-total-card">
-          <span className="reports-total-label">Total hours</span>
+          <span className="reports-total-label">{t('reports.totalHours')}</span>
           <strong>{totals.totalHours.toFixed(2)}h</strong>
-          <span className="reports-total-sub">{totals.totalBillable.toFixed(2)}h billable</span>
+          <span className="reports-total-sub">{t('reports.billableSuffix', { hours: totals.totalBillable.toFixed(2) })}</span>
         </div>
         <div className="reports-total-card">
-          <span className="reports-total-label">Total cost</span>
+          <span className="reports-total-label">{t('reports.totalCost')}</span>
           <strong>
             {totals.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} {projectCurrency}
           </strong>
           <span className="reports-total-sub">
-            {totals.billableCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} {projectCurrency} billable
+            {t('reports.billableCostSuffix', {
+              amount: totals.billableCost.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+              currency: projectCurrency,
+            })}
           </span>
         </div>
         <div className="reports-total-card">
-          <span className="reports-total-label">Entries</span>
+          <span className="reports-total-label">{t('reports.entries')}</span>
           <strong>{entries.length}</strong>
           <span className="reports-total-sub">
-            {hoursByUser.length} user{hoursByUser.length === 1 ? '' : 's'} • {hoursByTask.length} task{hoursByTask.length === 1 ? '' : 's'}
+            {t('reports.userTask', { users: hoursByUser.length, tasks: hoursByTask.length })}
           </span>
         </div>
       </div>
 
       <div className="reports-section">
         <div className="reports-section-header">
-          <h3>Hours by user</h3>
+          <h3>{t('reports.section.hoursByUser')}</h3>
           <button className="btn" onClick={handleExportHoursByUser} disabled={hoursByUser.length === 0}>
-            <Download size={14} /> CSV
+            <Download size={14} /> {t('common.export')}
           </button>
         </div>
         <div className="reports-table-wrap">
           <table className="reports-table">
             <thead>
               <tr>
-                <th>User</th>
-                <th>Hours</th>
-                <th>Billable</th>
-                <th>Entries</th>
+                <th>{t('reports.col.user')}</th>
+                <th>{t('reports.col.hours')}</th>
+                <th>{t('reports.col.billable')}</th>
+                <th>{t('reports.col.entries')}</th>
               </tr>
             </thead>
             <tbody>
               {hoursByUser.length === 0 ? (
-                <tr><td colSpan={4} className="reports-empty">No data</td></tr>
+                <tr><td colSpan={4} className="reports-empty">{t('common.noData')}</td></tr>
               ) : (
                 hoursByUser.map((u) => (
                   <tr key={u.userId}>
@@ -373,34 +380,34 @@ const Reports = () => {
 
       <div className="reports-section">
         <div className="reports-section-header">
-          <h3>Hours by task</h3>
+          <h3>{t('reports.section.hoursByTask')}</h3>
           <button className="btn" onClick={handleExportHoursByTask} disabled={hoursByTask.length === 0}>
-            <Download size={14} /> CSV
+            <Download size={14} /> {t('common.export')}
           </button>
         </div>
         <div className="reports-table-wrap">
           <table className="reports-table">
             <thead>
               <tr>
-                <th>Task</th>
-                <th>Hours</th>
-                <th>Billable</th>
-                <th>Entries</th>
+                <th>{t('reports.col.task')}</th>
+                <th>{t('reports.col.hours')}</th>
+                <th>{t('reports.col.billable')}</th>
+                <th>{t('reports.col.entries')}</th>
               </tr>
             </thead>
             <tbody>
               {hoursByTask.length === 0 ? (
-                <tr><td colSpan={4} className="reports-empty">No data</td></tr>
+                <tr><td colSpan={4} className="reports-empty">{t('common.noData')}</td></tr>
               ) : (
-                hoursByTask.map((t) => (
-                  <tr key={t.taskId}>
+                hoursByTask.map((tk) => (
+                  <tr key={tk.taskId}>
                     <td className="reports-task-cell">
-                      <strong>{t.title || '(no title)'}</strong>
-                      <div className="muted-inline">{t.taskId}</div>
+                      <strong>{tk.title || t('common.noTitle')}</strong>
+                      <div className="muted-inline">{tk.taskId}</div>
                     </td>
-                    <td>{t.hours.toFixed(2)}h</td>
-                    <td>{t.billable.toFixed(2)}h</td>
-                    <td>{t.entries}</td>
+                    <td>{tk.hours.toFixed(2)}h</td>
+                    <td>{tk.billable.toFixed(2)}h</td>
+                    <td>{tk.entries}</td>
                   </tr>
                 ))
               )}
@@ -411,25 +418,25 @@ const Reports = () => {
 
       <div className="reports-section">
         <div className="reports-section-header">
-          <h3>Cost by user</h3>
+          <h3>{t('reports.section.costByUser')}</h3>
           <button className="btn" onClick={handleExportCostByUser} disabled={costByUser.length === 0}>
-            <Download size={14} /> CSV
+            <Download size={14} /> {t('common.export')}
           </button>
         </div>
         <div className="reports-table-wrap">
           <table className="reports-table">
             <thead>
               <tr>
-                <th>User</th>
-                <th>Hours</th>
-                <th>Rate</th>
-                <th>Cost</th>
-                <th>Billable cost</th>
+                <th>{t('reports.col.user')}</th>
+                <th>{t('reports.col.hours')}</th>
+                <th>{t('reports.col.rate')}</th>
+                <th>{t('reports.col.cost')}</th>
+                <th>{t('reports.col.billableCost')}</th>
               </tr>
             </thead>
             <tbody>
               {costByUser.length === 0 ? (
-                <tr><td colSpan={5} className="reports-empty">No data</td></tr>
+                <tr><td colSpan={5} className="reports-empty">{t('common.noData')}</td></tr>
               ) : (
                 costByUser.map((u) => (
                   <tr key={u.userId}>
