@@ -12,6 +12,7 @@ import MyTime from './pages/MyTime';
 import Reports from './pages/Reports';
 import { me } from './services/authService';
 import { LanguageProvider } from './i18n';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
@@ -56,36 +57,40 @@ function App() {
     })();
   }, [user]);
 
+  // Wrapper: every page goes through this boundary so a crash inside a
+  // route renders the diagnostic card instead of blanking the React tree.
+  const guard = (node) => <ErrorBoundary label="Page failed to render">{node}</ErrorBoundary>;
+
   return (
     <LanguageProvider>
     <Router>
       <ToastContainer position="top-right" autoClose={3000} />
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={guard(<Login />)} />
+        <Route path="/register" element={guard(<Register />)} />
         <Route
           path="/"
           element={isAuthenticated ? <Navigate to="/projects" replace /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/projects"
-          element={isAuthenticated ? <Projects /> : <Navigate to="/login" />}
+          element={isAuthenticated ? guard(<Projects />) : <Navigate to="/login" />}
         />
         <Route
           path="/projects/:id"
-          element={isAuthenticated ? <ProjectDetail /> : <Navigate to="/login" />}
+          element={isAuthenticated ? guard(<ProjectDetail />) : <Navigate to="/login" />}
         />
         <Route
           path="/projects/:id/optimize"
-          element={isAuthenticated ? <ProjectOptimize /> : <Navigate to="/login" />}
+          element={isAuthenticated ? guard(<ProjectOptimize />) : <Navigate to="/login" />}
         />
         <Route
           path="/my-time"
-          element={isAuthenticated ? <MyTime /> : <Navigate to="/login" />}
+          element={isAuthenticated ? guard(<MyTime />) : <Navigate to="/login" />}
         />
         <Route
           path="/reports"
-          element={isAuthenticated ? <Reports /> : <Navigate to="/login" />}
+          element={isAuthenticated ? guard(<Reports />) : <Navigate to="/login" />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

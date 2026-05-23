@@ -55,6 +55,7 @@ import {
 import KanbanBoard from '../components/KanbanBoard';
 import TimeLogSection from '../components/TimeLogSection';
 import TaskRelationsSection from '../components/TaskRelationsSection';
+import ErrorBoundary from '../components/ErrorBoundary';
 const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 const ProjectGantt = lazy(() => import('../components/ProjectGantt'));
 const ResourceCurve = lazy(() => import('../components/ResourceCurve'));
@@ -998,26 +999,30 @@ const ProjectDetail = () => {
                 {tr('gantt.empty')}
               </div>
             ) : (
-              <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading Gantt…</span></div>}>
-                <ProjectGantt
-                  schedule={schedule}
-                  projectStart={project?.startDate || new Date()}
-                  viewMode={ganttBarMode}
-                  ganttViewMode={ganttGranularity}
-                  onTaskClick={(taskId) => {
-                    const t = tasks.find((x) => String(x._id || x.id) === String(taskId));
-                    if (t) handleOpenEditTask(t);
-                  }}
-                />
-              </Suspense>
+              <ErrorBoundary label="Gantt failed to render">
+                <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading Gantt…</span></div>}>
+                  <ProjectGantt
+                    schedule={schedule}
+                    projectStart={project?.startDate || new Date()}
+                    viewMode={ganttBarMode}
+                    ganttViewMode={ganttGranularity}
+                    onTaskClick={(taskId) => {
+                      const t = tasks.find((x) => String(x._id || x.id) === String(taskId));
+                      if (t) handleOpenEditTask(t);
+                    }}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             )}
             {schedule && (schedule.tasks?.length || 0) > 0 ? (
-              <Suspense fallback={null}>
-                <ResourceCurve
-                  projectId={id}
-                  refreshKey={`${schedule.projectDuration}|${tasks.length}`}
-                />
-              </Suspense>
+              <ErrorBoundary label="Resource curve failed to render">
+                <Suspense fallback={null}>
+                  <ResourceCurve
+                    projectId={id}
+                    refreshKey={`${schedule.projectDuration}|${tasks.length}`}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             ) : null}
           </div>
         ) : tab === 'list' ? (
