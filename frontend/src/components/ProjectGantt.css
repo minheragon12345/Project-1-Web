@@ -14,13 +14,13 @@
   font-family: inherit;
 }
 
-/* frappe-gantt's wrapping div sets `height: var(--gv-grid-height)` and
-   `overflow: auto`. We want the wrapper to size itself by content so the
-   Timeline panel can extend below — only horizontal scroll matters here. */
+/* frappe-gantt's wrapping `.gantt-container` MUST keep its computed
+   `height: var(--gv-grid-height)` — the inner `.gantt` SVG is positioned
+   absolutely against it. If we set the wrapper to `height: auto` the
+   container collapses to the sticky header height and the SVG disappears.
+   Instead we just enforce a sensible minimum so the panel feels roomy. */
 .project-gantt-container .gantt-container {
-  height: auto !important;
-  overflow-x: auto;
-  overflow-y: visible;
+  min-height: 320px;
 }
 
 /* Critical-path bars: red fill + red progress. */
