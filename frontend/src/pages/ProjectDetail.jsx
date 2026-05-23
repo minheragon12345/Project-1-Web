@@ -104,6 +104,7 @@ const ProjectDetail = () => {
     timeUnit: 'day',
     maxHeadcount: '',
     lostRevenuePerUnit: '',
+    lostRevenueByDurationJson: '',
   });
 
   const [members, setMembers] = useState([]);
@@ -148,6 +149,8 @@ const ProjectDetail = () => {
     estimatedHours: 0,
     duration: 0,
     peopleRequired: 1,
+    minDuration: '',
+    marginalCost: '',
   });
   const [taskSaving, setTaskSaving] = useState(false);
 
@@ -185,6 +188,9 @@ const ProjectDetail = () => {
         timeUnit: p.timeUnit || 'day',
         maxHeadcount: p.maxHeadcount ?? '',
         lostRevenuePerUnit: p.lostRevenuePerUnit ?? '',
+        lostRevenueByDurationJson: p.lostRevenueByDuration
+          ? JSON.stringify(p.lostRevenueByDuration, null, 2)
+          : '',
       });
     } catch (err) {
       toast.error(err.message || 'Failed to load project');
@@ -349,6 +355,23 @@ const ProjectDetail = () => {
     try {
       const headcountRaw = String(form.maxHeadcount).trim();
       const lostRevRaw = String(form.lostRevenuePerUnit).trim();
+      const lostRevTableRaw = String(form.lostRevenueByDurationJson || '').trim();
+      let lostRevenueByDuration;
+      if (lostRevTableRaw === '') {
+        lostRevenueByDuration = null;
+      } else {
+        try {
+          const parsed = JSON.parse(lostRevTableRaw);
+          if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+            throw new Error('must be a JSON object');
+          }
+          lostRevenueByDuration = parsed;
+        } catch (err) {
+          toast.error(`Lost-revenue table is not valid JSON: ${err.message}`);
+          setSaving(false);
+          return;
+        }
+      }
       await updateProject(id, {
         name: form.name.trim(),
         description: form.description.trim(),
@@ -362,6 +385,7 @@ const ProjectDetail = () => {
         timeUnit: form.timeUnit || 'day',
         maxHeadcount: headcountRaw === '' ? null : Number(headcountRaw),
         lostRevenuePerUnit: lostRevRaw === '' ? null : Number(lostRevRaw),
+        lostRevenueByDuration,
       });
       toast.success('Changes saved');
       fetchProject();
@@ -471,6 +495,8 @@ const ProjectDetail = () => {
       estimatedHours: 0,
       duration: 0,
       peopleRequired: 1,
+      minDuration: '',
+      marginalCost: '',
     });
     setCommentList([]);
     setCommentText('');
@@ -515,6 +541,8 @@ const ProjectDetail = () => {
       estimatedHours: typeof task.estimatedHours === 'number' ? task.estimatedHours : 0,
       duration: typeof task.duration === 'number' ? task.duration : 0,
       peopleRequired: typeof task.peopleRequired === 'number' ? task.peopleRequired : 1,
+      minDuration: typeof task.minDuration === 'number' ? task.minDuration : '',
+      marginalCost: typeof task.marginalCost === 'number' ? task.marginalCost : '',
     });
     fetchTaskComments(task._id || task.id);
     setShowTaskModal(true);
@@ -540,6 +568,8 @@ const ProjectDetail = () => {
       estimatedHours: Math.max(0, Number(taskForm.estimatedHours) || 0),
       duration: Math.max(0, Number(taskForm.duration) || 0),
       peopleRequired: Math.max(1, Math.floor(Number(taskForm.peopleRequired) || 1)),
+      minDuration: String(taskForm.minDuration).trim() === '' ? null : Math.max(0, Number(taskForm.minDuration) || 0),
+      marginalCost: String(taskForm.marginalCost).trim() === '' ? null : Math.max(0, Number(taskForm.marginalCost) || 0),
     };
     if (isAutoProgress) {
       if (taskForm.cancelled) payload.status = 'cancelled';
@@ -1213,6 +1243,22 @@ const ProjectDetail = () => {
                 </label>
               </div>
 
+              <label className="full-width-label">
+                <span>Lost-revenue table (overrides linear)</span>
+                <textarea
+                  className="lost-rev-textarea"
+                  rows={4}
+                  placeholder={'(optional) JSON object keyed by duration, e.g.\n{"16": 20, "15": 15, "14": 10, "13": 6, "12": 3}'}
+                  value={form.lostRevenueByDurationJson}
+                  onChange={(e) => setForm({ ...form, lostRevenueByDurationJson: e.target.value })}
+                  disabled={!canManageProject}
+                />
+                <small className="muted">
+                  When set, used directly by crashing analysis instead of the linear
+                  <code> lostRevenuePerUnit × d</code>. Reproduces study-guide §3.6's tabular cost curve.
+                </small>
+              </label>
+
               {canManageProject ? (
                 <div className="settings-actions">
                   <button type="submit" className="btn-primary" disabled={saving}>
@@ -1555,6 +1601,39 @@ const ProjectDetail = () => {
                     step={1}
                     value={taskForm.peopleRequired}
                     onChange={(e) => setTaskForm({ ...taskForm, peopleRequired: parseInt(e.target.value || '1', 10) })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group half">
+                  <label title="Floor for crashing analysis (§3). Leave empty to mark task as non-crashable.">
+                    Min duration ({unitLabel(project?.timeUnit || 'day')}) — optional
+                  </label>
+                  <input
+                    type="number"
+                    className="custom-input"
+                    min={0}
+                    max={100000}
+                    step={0.5}
+                    placeholder="(empty = not crashable)"
+                    value={taskForm.minDuration}
+                    onChange={(e) => setTaskForm({ ...taskForm, minDuration: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group half">
+                  <label title="Cost per unit of crash. Used by crashing analysis (§3) to pick cheapest task to shorten.">
+                    Marginal cost / unit — optional
+                  </label>
+                  <input
+                    type="number"
+                    className="custom-input"
+                    min={0}
+                    step={0.01}
+                    placeholder="(empty = not crashable)"
+                    value={taskForm.marginalCost}
+                    onChange={(e) => setTaskForm({ ...taskForm, marginalCost: e.target.value })}
                   />
                 </div>
               </div>

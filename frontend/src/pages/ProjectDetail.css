@@ -312,6 +312,46 @@
   font-size: 0.78rem;
 }
 
+.full-width-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.lost-rev-textarea {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+  min-height: 70px;
+}
+
+.lost-rev-textarea:focus {
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.full-width-label small {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.full-width-label code {
+  background-color: var(--surface-secondary);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+}
+
 .settings-form label,
 .member-add-form label {
   display: flex;

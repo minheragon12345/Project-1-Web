@@ -60,7 +60,13 @@ export default function ProjectOptimize() {
           <h2>Crashing analysis</h2>
           {project ? (
             <span className="optimize-sub">
-              {project.name} · lost revenue {analysis?.lostRevenuePerUnit ?? '?'} / {unitShort}
+              {project.name}
+              {' · '}
+              {analysis?.lostRevenueMode === 'table' ? (
+                <>lost revenue via lookup table ({Object.keys(analysis.lostRevenueByDuration || {}).length} entries)</>
+              ) : (
+                <>lost revenue {analysis?.lostRevenuePerUnit ?? '?'} / {unitShort} (linear)</>
+              )}
             </span>
           ) : null}
         </div>

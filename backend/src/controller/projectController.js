@@ -129,6 +129,49 @@ function parseNullablePositiveNumber(value, label, { minValue = 1, allowZero = f
   return n;
 }
 
+// Accepts { "12": 3, "13": 6, ... } | null | "" → returns a plain object,
+// null (unset), or an { error } shape.
+function parseLostRevenueByDuration(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return { error: 'lostRevenueByDuration must be an object keyed by duration' };
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(value)) {
+    const kn = Number(k);
+    if (!Number.isFinite(kn) || kn < 0) {
+      return { error: `lostRevenueByDuration: invalid duration key "${k}"` };
+    }
+    const vn = Number(v);
+    if (!Number.isFinite(vn) || vn < 0) {
+      return { error: `lostRevenueByDuration: value for ${k} must be >= 0` };
+    }
+    out[String(kn)] = vn;
+  }
+  if (Object.keys(out).length === 0) return null;
+  return out;
+}
+
+// Convert Mongoose Map | plain object | null → plain object (or null when empty).
+function mapToPlain(value) {
+  if (value == null) return null;
+  if (typeof value.toJSON === 'function') {
+    const obj = value.toJSON();
+    return obj && Object.keys(obj).length ? obj : null;
+  }
+  if (value instanceof Map) {
+    if (value.size === 0) return null;
+    const out = {};
+    for (const [k, v] of value.entries()) out[String(k)] = v;
+    return out;
+  }
+  if (typeof value === 'object') {
+    return Object.keys(value).length ? value : null;
+  }
+  return null;
+}
+
 function toUserDto(u) {
   if (!u) return null;
   if (typeof u === 'string') return { id: u };
@@ -153,6 +196,7 @@ function mapProjectForList(p, reqUserId) {
     timeUnit: p.timeUnit || 'day',
     maxHeadcount: p.maxHeadcount ?? null,
     lostRevenuePerUnit: p.lostRevenuePerUnit ?? null,
+    lostRevenueByDuration: mapToPlain(p.lostRevenueByDuration),
     isPersonal: p.isPersonal,
     owner: toUserDto(p.owner),
     memberCount: (p.members?.length || 0) + 1,
@@ -163,7 +207,7 @@ function mapProjectForList(p, reqUserId) {
 }
 
 router.post('/', async (req, res) => {
-  const { name, description, startDate, endDate, budget, timeUnit, maxHeadcount, lostRevenuePerUnit } = req.body;
+  const { name, description, startDate, endDate, budget, timeUnit, maxHeadcount, lostRevenuePerUnit, lostRevenueByDuration } = req.body;
 
   try {
     if (!name || !String(name).trim()) {
@@ -196,6 +240,10 @@ router.post('/', async (req, res) => {
     if (parsedRevenue && typeof parsedRevenue === 'object' && parsedRevenue.error) {
       return res.status(400).json({ message: parsedRevenue.error });
     }
+    const parsedRevTable = parseLostRevenueByDuration(lostRevenueByDuration);
+    if (parsedRevTable && typeof parsedRevTable === 'object' && parsedRevTable.error) {
+      return res.status(400).json({ message: parsedRevTable.error });
+    }
 
     const project = await Project.create({
       name: String(name).trim(),
@@ -209,6 +257,7 @@ router.post('/', async (req, res) => {
       timeUnit: parsedTimeUnit === undefined ? 'day' : parsedTimeUnit,
       maxHeadcount: parsedHeadcount === undefined ? null : parsedHeadcount,
       lostRevenuePerUnit: parsedRevenue === undefined ? null : parsedRevenue,
+      lostRevenueByDuration: parsedRevTable === undefined ? null : parsedRevTable,
       isPersonal: false,
       isDeleted: false,
     });
@@ -304,6 +353,7 @@ router.get('/:id', async (req, res) => {
         timeUnit: project.timeUnit || 'day',
         maxHeadcount: project.maxHeadcount ?? null,
         lostRevenuePerUnit: project.lostRevenuePerUnit ?? null,
+        lostRevenueByDuration: mapToPlain(project.lostRevenueByDuration),
         isPersonal: project.isPersonal,
         owner: toUserDto(project.owner),
         members,
@@ -319,7 +369,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, description, status, startDate, endDate, budget, timeUnit, maxHeadcount, lostRevenuePerUnit } = req.body;
+  const { name, description, status, startDate, endDate, budget, timeUnit, maxHeadcount, lostRevenuePerUnit, lostRevenueByDuration } = req.body;
 
   try {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
@@ -380,6 +430,14 @@ router.put('/:id', async (req, res) => {
         return res.status(400).json({ message: parsed.error });
       }
       project.lostRevenuePerUnit = parsed;
+    }
+    if (lostRevenueByDuration !== undefined) {
+      const parsed = parseLostRevenueByDuration(lostRevenueByDuration);
+      if (parsed && typeof parsed === 'object' && parsed.error) {
+        return res.status(400).json({ message: parsed.error });
+      }
+      // Setting null clears the Map; setting an object replaces it.
+      project.lostRevenueByDuration = parsed;
     }
 
     await project.save();
@@ -984,8 +1042,10 @@ router.get('/:id/resource-curve', async (req, res) => {
 // tasks by 1 unit, lowest marginalCost first, recomputes the schedule each
 // step. Reports the synthesis table with the totalCost-minimizing row flagged.
 //
-// Requires project.lostRevenuePerUnit to be set; treats lostRev(d) = perUnit*d
-// as the simplest linear interpretation of §3.6's lost-revenue table.
+// Lost-revenue curve: prefers project.lostRevenueByDuration (Map<duration,
+// revenue>) when set — this matches §3.6's non-linear lookup table exactly.
+// Falls back to project.lostRevenuePerUnit * d (linear) otherwise.
+// At least one of the two must be set.
 router.get('/:id/crash-analysis', async (req, res) => {
   const { id } = req.params;
 
@@ -993,17 +1053,33 @@ router.get('/:id/crash-analysis', async (req, res) => {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid project id' });
 
     const project = await Project.findOne({ _id: id, isDeleted: false })
-      .select('owner members isDeleted timeUnit lostRevenuePerUnit');
+      .select('owner members isDeleted timeUnit lostRevenuePerUnit lostRevenueByDuration');
     if (!project) return res.status(404).json({ message: 'Project not found' });
     if (!canRead(project, req.userId)) return res.status(403).json({ message: 'Forbidden' });
 
-    if (project.lostRevenuePerUnit == null) {
-      return res.status(400).json({ message: 'project.lostRevenuePerUnit is not set; cannot run crashing analysis' });
-    }
-    const perUnit = Number(project.lostRevenuePerUnit);
-    if (!Number.isFinite(perUnit) || perUnit < 0) {
+    const lookup = mapToPlain(project.lostRevenueByDuration);
+    const perUnit = project.lostRevenuePerUnit == null
+      ? null
+      : Number(project.lostRevenuePerUnit);
+    if (perUnit != null && (!Number.isFinite(perUnit) || perUnit < 0)) {
       return res.status(400).json({ message: 'project.lostRevenuePerUnit must be >= 0' });
     }
+    if (lookup == null && perUnit == null) {
+      return res.status(400).json({
+        message: 'Set project.lostRevenueByDuration (table) or project.lostRevenuePerUnit (linear) before running crashing analysis',
+      });
+    }
+
+    // Build lostRev fn: lookup wins; linear used either as fallback or when
+    // duration isn't in the lookup.
+    const lostRevenueFn = (d) => {
+      if (lookup) {
+        const v = lookup[String(d)];
+        if (v != null) return Number(v) || 0;
+      }
+      if (perUnit != null) return perUnit * d;
+      return 0;
+    };
 
     const tasksRaw = await Note.find({ project: id, isDeleted: false })
       .select('_id title duration dependencies minDuration marginalCost')
@@ -1019,7 +1095,7 @@ router.get('/:id/crash-analysis', async (req, res) => {
 
     let result;
     try {
-      result = computeCrashingTable(tasksForCrash, (d) => perUnit * d);
+      result = computeCrashingTable(tasksForCrash, lostRevenueFn);
     } catch (err) {
       if (/cycle/i.test(err.message)) {
         return res.status(400).json({ message: 'Cycle detected in dependency graph' });
@@ -1039,6 +1115,8 @@ router.get('/:id/crash-analysis', async (req, res) => {
     return res.json({
       timeUnit: project.timeUnit || 'day',
       lostRevenuePerUnit: perUnit,
+      lostRevenueByDuration: lookup,
+      lostRevenueMode: lookup ? 'table' : 'linear',
       rows: result.rows,
       optimalIndex: result.optimalIndex,
       steps,
