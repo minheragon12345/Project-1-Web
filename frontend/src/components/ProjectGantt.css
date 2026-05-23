@@ -1,6 +1,9 @@
 .project-gantt-container {
   width: 100%;
-  overflow-x: auto;
+  /* Allow the panel to grow with the gantt so users don't need an internal
+     scrollbar. The horizontal scroll lives on the inner .gantt-container
+     (frappe-gantt's own scroll wrapper). */
+  overflow: visible;
   background-color: var(--surface-primary, #fff);
   border: 1px solid var(--border-primary, #e5e7eb);
   border-radius: 8px;
@@ -9,6 +12,15 @@
 
 .project-gantt-container .gantt {
   font-family: inherit;
+}
+
+/* frappe-gantt's wrapping div sets `height: var(--gv-grid-height)` and
+   `overflow: auto`. We want the wrapper to size itself by content so the
+   Timeline panel can extend below — only horizontal scroll matters here. */
+.project-gantt-container .gantt-container {
+  height: auto !important;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 /* Critical-path bars: red fill + red progress. */
@@ -25,48 +37,61 @@
   font-weight: 600;
 }
 
-/* Dark theme overrides */
+/* ---------- Dark theme ----------
+   frappe-gantt v1.2 reads its colors from CSS variables on :root (light) or
+   html[data-theme=dark] (dark). Our app uses a `.dark-theme` class on the
+   page container, so the built-in dark vars never trigger. Mirror them
+   under `.dark-theme` and fix the few selectors that don't use vars.        */
+
 .dark-theme .project-gantt-container {
+  --g-arrow-color: #e5e7eb;
+  --g-bar-color: #4b5563;
+  --g-bar-border: #6b7280;
+  --g-tick-color-thick: #374151;
+  --g-tick-color: #1f2937;
+  --g-actions-background: #1f2937;
+  --g-border-color: #374151;
+  --g-text-muted: #9ca3af;
+  --g-text-light: #f9fafb;
+  --g-text-dark: #f3f4f6;
+  --g-progress-color: #6366f1;
+  --g-handle-color: #d1d5db;
+  --g-weekend-label-color: #374151;
+  --g-expected-progress: #4338ca;
+  --g-header-background: #111827;
+  --g-row-color: #1f2937;
+  --g-row-border-color: #374151;
+  --g-today-highlight: #9ca3af;
+  --g-popup-actions: #1f2937;
+  --g-weekend-highlight-color: #111827;
+
   background-color: var(--surface-primary, #1f2937);
   border-color: var(--border-primary, #374151);
 }
 
-.dark-theme .gantt .grid-header {
+/* Some selectors target attributes directly instead of vars — patch them. */
+.dark-theme .project-gantt-container .grid-row {
   fill: #1f2937;
-  stroke: #374151;
 }
 
-.dark-theme .gantt .grid-row {
+.dark-theme .project-gantt-container .grid-row:nth-child(even) {
   fill: #111827;
 }
 
-.dark-theme .gantt .grid-row:nth-child(even) {
-  fill: #1f2937;
-}
-
-.dark-theme .gantt .row-line {
+.dark-theme .project-gantt-container .row-line {
   stroke: #374151;
 }
 
-.dark-theme .gantt .tick {
+.dark-theme .project-gantt-container .tick {
   stroke: #374151;
 }
 
-.dark-theme .gantt .lower-text,
-.dark-theme .gantt .upper-text {
+.dark-theme .project-gantt-container .lower-text,
+.dark-theme .project-gantt-container .upper-text {
   fill: #d1d5db;
 }
 
-.dark-theme .gantt .bar {
-  fill: #4b5563;
-  stroke: #6b7280;
-}
-
-.dark-theme .gantt .bar-progress {
-  fill: #6366f1;
-}
-
-.dark-theme .gantt .bar-label {
+.dark-theme .project-gantt-container .bar-label {
   fill: #f9fafb;
 }
 
