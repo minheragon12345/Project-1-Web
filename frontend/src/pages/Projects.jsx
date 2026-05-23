@@ -170,8 +170,9 @@ const Projects = () => {
             <FolderKanban size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
             {t('projects.heading')}
           </h2>
-          <div className="user-greeting">
-            {t('nav.greeting', { name: user?.username || t('nav.guest') })}
+          <div className="user-greeting" style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+            <LanguageSwitcher />
+            <span>{t('nav.greeting', { name: user?.username || t('nav.guest') })}</span>
           </div>
         </div>
 
@@ -222,7 +223,6 @@ const Projects = () => {
           </div>
 
           <div className="action-buttons">
-            <LanguageSwitcher />
             <button className="btn-secondary" onClick={toggleTheme} title={`Theme: ${themePref}`}>
               {themePref === 'light' ? (
                 <Sun size={18} />
