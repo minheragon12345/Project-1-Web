@@ -101,6 +101,9 @@ const ProjectDetail = () => {
     budgetAmount: 0,
     budgetCurrency: 'USD',
     budgetType: 'hourly',
+    timeUnit: 'day',
+    maxHeadcount: '',
+    lostRevenuePerUnit: '',
   });
 
   const [members, setMembers] = useState([]);
@@ -179,6 +182,9 @@ const ProjectDetail = () => {
         budgetAmount: p.budget?.amount ?? 0,
         budgetCurrency: p.budget?.currency || 'USD',
         budgetType: p.budget?.type || 'hourly',
+        timeUnit: p.timeUnit || 'day',
+        maxHeadcount: p.maxHeadcount ?? '',
+        lostRevenuePerUnit: p.lostRevenuePerUnit ?? '',
       });
     } catch (err) {
       toast.error(err.message || 'Failed to load project');
@@ -341,6 +347,8 @@ const ProjectDetail = () => {
     }
     setSaving(true);
     try {
+      const headcountRaw = String(form.maxHeadcount).trim();
+      const lostRevRaw = String(form.lostRevenuePerUnit).trim();
       await updateProject(id, {
         name: form.name.trim(),
         description: form.description.trim(),
@@ -351,6 +359,9 @@ const ProjectDetail = () => {
           currency: form.budgetCurrency || 'USD',
           type: form.budgetType || 'hourly',
         },
+        timeUnit: form.timeUnit || 'day',
+        maxHeadcount: headcountRaw === '' ? null : Number(headcountRaw),
+        lostRevenuePerUnit: lostRevRaw === '' ? null : Number(lostRevRaw),
       });
       toast.success('Changes saved');
       fetchProject();
@@ -1163,6 +1174,42 @@ const ProjectDetail = () => {
                     <option value="hourly">Hourly</option>
                     <option value="fixed">Fixed</option>
                   </select>
+                </label>
+              </div>
+
+              <div className="form-row">
+                <label>
+                  <span>Time unit</span>
+                  <select value={form.timeUnit} onChange={(e) => setForm({ ...form, timeUnit: e.target.value })} disabled={!canManageProject}>
+                    <option value="hour">Hour</option>
+                    <option value="day">Day</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Max headcount</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="(unset)"
+                    value={form.maxHeadcount}
+                    onChange={(e) => setForm({ ...form, maxHeadcount: e.target.value })}
+                    disabled={!canManageProject}
+                  />
+                </label>
+                <label>
+                  <span>Lost revenue / unit</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="(unset)"
+                    value={form.lostRevenuePerUnit}
+                    onChange={(e) => setForm({ ...form, lostRevenuePerUnit: e.target.value })}
+                    disabled={!canManageProject}
+                  />
                 </label>
               </div>
 
