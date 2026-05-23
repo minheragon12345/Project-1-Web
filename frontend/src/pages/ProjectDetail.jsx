@@ -322,13 +322,13 @@ const ProjectDetail = () => {
   };
 
   const handleHardDeleteTask = async (task) => {
-    if (!window.confirm('Permanently delete this task? Cannot be undone.')) return;
+    if (!window.confirm(tr('settings.permDeleteTaskConfirm'))) return;
     try {
       await deleteNotePermanent(task._id || task.id);
-      toast.success('Permanently deleted');
+      toast.success(tr('settings.permDeleteToast'));
       fetchTrash();
     } catch (err) {
-      toast.error(err.message || 'Failed to delete');
+      toast.error(err.message || tr('settings.permDeleteToast'));
     }
   };
 
@@ -461,13 +461,13 @@ const ProjectDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete project "${project?.name}"? This action cannot be undone.`)) return;
+    if (!window.confirm(tr('settings.deleteProjectConfirm', { name: project?.name || '' }))) return;
     try {
       await deleteProject(id);
-      toast.success('Project deleted');
+      toast.success(tr('projects.deleted'));
       navigate('/projects');
     } catch (err) {
-      toast.error(err.message || 'Failed to delete');
+      toast.error(err.message || tr('projects.deleted'));
     }
   };
 
@@ -523,11 +523,11 @@ const ProjectDetail = () => {
       toast.error('Cannot identify current user.');
       return;
     }
-    if (!window.confirm(`Leave project "${project?.name}"? You will lose access to its tasks.`)) return;
+    if (!window.confirm(tr('settings.leaveConfirm', { name: project?.name || '' }))) return;
     setLeaving(true);
     try {
       await removeProjectMember(id, myId);
-      toast.success('You left the project');
+      toast.success(tr('settings.leaveProject'));
       navigate('/projects');
     } catch (err) {
       toast.error(err.message || 'Failed to leave project');
@@ -746,13 +746,13 @@ const ProjectDetail = () => {
       toast.info('Only the task owner can move it to trash.');
       return;
     }
-    if (!window.confirm('Move this task to trash?')) return;
+    if (!window.confirm(tr('settings.moveToTrashConfirm'))) return;
     try {
       await deleteNote(task._id || task.id);
-      toast.success('Moved to trash');
+      toast.success(tr('common.delete'));
       fetchTasks();
     } catch (err) {
-      toast.error(err.message || 'Could not delete');
+      toast.error(err.message || tr('mytime.deleteFailed'));
     }
   };
 
@@ -1240,15 +1240,15 @@ const ProjectDetail = () => {
         ) : tab === 'log' ? (
           <div className="audit-log-panel">
             <div className="audit-log-header">
-              <h3>Activity log {logItems.length ? `(${logItems.length})` : ''}</h3>
+              <h3>{tr('log.heading')} {logItems.length ? `(${logItems.length})` : ''}</h3>
               {logLoading ? <Loader size={14} className="spin" /> : null}
             </div>
             {!canViewLog ? (
-              <div className="tab-placeholder"><p>You do not have access to this log.</p></div>
+              <div className="tab-placeholder"><p>{tr('log.noAccess')}</p></div>
             ) : logLoading && logItems.length === 0 ? (
-              <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading…</span></div>
+              <div className="projects-loading"><Loader className="spin" size={24} /> <span>{tr('common.loading')}</span></div>
             ) : logItems.length === 0 ? (
-              <div className="tab-placeholder"><ScrollText size={36} /><p>No activity yet.</p></div>
+              <div className="tab-placeholder"><ScrollText size={36} /><p>{tr('log.empty')}</p></div>
             ) : (
               <div className="audit-log-list">
                 {logItems.map((l) => (
@@ -1257,7 +1257,7 @@ const ProjectDetail = () => {
                       {l.createdAt ? new Date(l.createdAt).toLocaleString('vi-VN') : '—'}
                     </span>
                     <span className="audit-log-actor">
-                      {l.actor?.username || l.actor?.email || 'unknown'}
+                      {l.actor?.username || l.actor?.email || tr('log.unknownActor')}
                     </span>
                     <span className="audit-log-action">{l.action}</span>
                     <span className="audit-log-target">
@@ -1271,41 +1271,41 @@ const ProjectDetail = () => {
         ) : (
           <div className="settings-panel">
             <form className="settings-form" onSubmit={handleSaveSettings}>
-              <h3>Project info</h3>
+              <h3>{tr('settings.projectInfo')}</h3>
               <label>
-                <span>Project name *</span>
+                <span>{tr('settings.projectName')}</span>
                 <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManageProject} maxLength={120} />
               </label>
               <label>
-                <span>Description</span>
+                <span>{tr('settings.description')}</span>
                 <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} disabled={!canManageProject} rows={3} maxLength={2000} />
               </label>
 
               <div className="form-row">
                 <label>
-                  <span>Start date</span>
+                  <span>{tr('settings.startDate')}</span>
                   <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} disabled={!canManageProject} />
                 </label>
                 <label>
-                  <span>End date</span>
+                  <span>{tr('settings.endDate')}</span>
                   <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} disabled={!canManageProject} />
                 </label>
               </div>
 
               <div className="form-row">
                 <label>
-                  <span>Budget</span>
+                  <span>{tr('settings.budget')}</span>
                   <input type="number" min="0" step="0.01" value={form.budgetAmount} onChange={(e) => setForm({ ...form, budgetAmount: e.target.value })} disabled={!canManageProject} />
                 </label>
                 <label>
-                  <span>Currency</span>
+                  <span>{tr('settings.currency')}</span>
                   <input type="text" maxLength={8} value={form.budgetCurrency} onChange={(e) => setForm({ ...form, budgetCurrency: e.target.value.toUpperCase() })} disabled={!canManageProject} />
                 </label>
                 <label>
-                  <span>Type</span>
+                  <span>{tr('settings.budgetType')}</span>
                   <select value={form.budgetType} onChange={(e) => setForm({ ...form, budgetType: e.target.value })} disabled={!canManageProject}>
-                    <option value="hourly">Hourly</option>
-                    <option value="fixed">Fixed</option>
+                    <option value="hourly">{tr('settings.budgetType.hourly')}</option>
+                    <option value="fixed">{tr('settings.budgetType.fixed')}</option>
                   </select>
                 </label>
               </div>
@@ -1446,7 +1446,7 @@ const ProjectDetail = () => {
                 <div className="settings-actions">
                   <button type="submit" className="btn-primary" disabled={saving}>
                     {saving ? <Loader size={16} className="spin" /> : <Save size={16} />}
-                    <span>{saving ? 'Saving…' : 'Save changes'}</span>
+                    <span>{saving ? tr('common.saving') : tr('settings.saveChanges')}</span>
                   </button>
                 </div>
               ) : null}
@@ -1454,7 +1454,7 @@ const ProjectDetail = () => {
 
             <div className="budget-summary-card">
               <div className="budget-summary-header">
-                <h3>Budget summary</h3>
+                <h3>{tr('settings.budgetSummary')}</h3>
                 {budgetLoading ? <Loader size={14} className="spin" /> : null}
               </div>
 
@@ -1462,37 +1462,37 @@ const ProjectDetail = () => {
                 <>
                   <div className="budget-stats">
                     <div className="budget-stat">
-                      <span className="budget-stat-label">Planned</span>
+                      <span className="budget-stat-label">{tr('settings.budgetPlanned')}</span>
                       <strong>
                         {(budgetSummary.planned?.amount || 0).toLocaleString()} {budgetSummary.planned?.currency || 'USD'}
                       </strong>
                       <span className="budget-stat-sub">{budgetSummary.planned?.type || 'hourly'}</span>
                     </div>
                     <div className="budget-stat">
-                      <span className="budget-stat-label">Actual cost</span>
+                      <span className="budget-stat-label">{tr('settings.budgetActual')}</span>
                       <strong>
                         {(budgetSummary.actual?.cost || 0).toLocaleString()} {budgetSummary.planned?.currency || 'USD'}
                       </strong>
                       <span className="budget-stat-sub">
-                        {(budgetSummary.actual?.billableCost || 0).toLocaleString()} billable
+                        {tr('reports.billableSuffix', { hours: (budgetSummary.actual?.billableCost || 0).toLocaleString() })}
                       </span>
                     </div>
                     <div className="budget-stat">
-                      <span className="budget-stat-label">Hours logged</span>
+                      <span className="budget-stat-label">{tr('settings.hoursLogged')}</span>
                       <strong>{(budgetSummary.actual?.hours || 0).toFixed(2)}h</strong>
                       <span className="budget-stat-sub">
-                        {(budgetSummary.actual?.billableHours || 0).toFixed(2)}h billable
+                        {tr('reports.billableSuffix', { hours: (budgetSummary.actual?.billableHours || 0).toFixed(2) })}
                       </span>
                     </div>
                     <div className="budget-stat">
-                      <span className="budget-stat-label">Remaining</span>
+                      <span className="budget-stat-label">{tr('settings.budgetRemaining')}</span>
                       <strong className={budgetSummary.remaining !== null && budgetSummary.remaining < 0 ? 'budget-over' : ''}>
                         {budgetSummary.remaining === null
                           ? '—'
                           : `${budgetSummary.remaining.toLocaleString()} ${budgetSummary.planned?.currency || 'USD'}`}
                       </strong>
                       <span className="budget-stat-sub">
-                        {budgetSummary.usedPercent === null ? 'no budget set' : `${budgetSummary.usedPercent}% used`}
+                        {budgetSummary.usedPercent === null ? tr('common.unset') : `${budgetSummary.usedPercent}% ${tr('settings.budgetUsedPct')}`}
                       </span>
                     </div>
                   </div>
@@ -1558,11 +1558,11 @@ const ProjectDetail = () => {
 
             <div className="members-section">
               <div className="members-header">
-                <h3>Members ({roleStats.total})</h3>
+                <h3>{tr('settings.membersHeading', { n: roleStats.total })}</h3>
                 <div className="members-stats">
-                  <span className="role-stat role-owner">1 owner</span>
-                  <span className="role-stat role-editor">{roleStats.editors} editor{roleStats.editors === 1 ? '' : 's'}</span>
-                  <span className="role-stat role-viewer">{roleStats.viewers} viewer{roleStats.viewers === 1 ? '' : 's'}</span>
+                  <span className="role-stat role-owner">{tr('settings.roleStats.owner')}</span>
+                  <span className="role-stat role-editor">{tr('settings.roleStats.editors', { n: roleStats.editors })}</span>
+                  <span className="role-stat role-viewer">{tr('settings.roleStats.viewers', { n: roleStats.viewers })}</span>
                 </div>
               </div>
 
@@ -1577,11 +1577,11 @@ const ProjectDetail = () => {
                       onChange={(e) => setMemberEmail(e.target.value)}
                     />
                     <select value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
-                      {opts.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                      {opts.map((o) => (<option key={o.value} value={o.value}>{tr('settings.memberRole.' + o.value)}</option>))}
                     </select>
                     <button type="submit" className="btn-primary" disabled={memberSaving}>
                       {memberSaving ? <Loader size={16} className="spin" /> : <UserPlus size={16} />}
-                      <span>Add</span>
+                      <span>{tr('common.add')}</span>
                     </button>
                   </form>
                 );
@@ -1596,7 +1596,7 @@ const ProjectDetail = () => {
                     <strong>{project.owner?.username || '—'}</strong>
                     <span className="member-email">{project.owner?.email || ''}</span>
                   </div>
-                  <span className="member-meta">Project creator</span>
+                  <span className="member-meta">{tr('settings.memberCreator')}</span>
                   <span className="project-role role-owner">owner</span>
                 </div>
 
@@ -1612,11 +1612,11 @@ const ProjectDetail = () => {
                       <div className="member-info">
                         <strong>
                           {m.user?.username || '—'}
-                          {isMe ? <span className="me-tag">you</span> : null}
+                          {isMe ? <span className="me-tag">{tr('settings.youTag')}</span> : null}
                         </strong>
                         <span className="member-email">{m.user?.email || ''}</span>
                       </div>
-                      <span className="member-meta">Added {formatMemberDate(m.addedAt)}</span>
+                      <span className="member-meta">{tr('settings.memberAdded', { date: formatMemberDate(m.addedAt) })}</span>
                       {(() => {
                         const subordinate = m.role === 'editor' || m.role === 'reviewer' || m.role === 'viewer';
                         const canManageThis = isOwner || (canManageProject && subordinate);
@@ -1631,11 +1631,11 @@ const ProjectDetail = () => {
                               onChange={(e) => handleChangeMemberRole(memberId, e.target.value)}
                               disabled={pending}
                             >
-                              {opts.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                              {opts.map((o) => (<option key={o.value} value={o.value}>{tr('settings.memberRole.' + o.value)}</option>))}
                             </select>
                             <button
                               className="icon-btn danger"
-                              title="Remove member"
+                              title={tr('settings.removeMember')}
                               onClick={() => handleRemoveMember(memberId)}
                               disabled={pending}
                             >
@@ -1649,7 +1649,7 @@ const ProjectDetail = () => {
                 })}
 
                 {members.length === 0 ? (
-                  <div className="member-empty">No members yet besides the project owner.</div>
+                  <div className="member-empty">{tr('settings.noMembers')}</div>
                 ) : null}
               </div>
 
@@ -1662,7 +1662,7 @@ const ProjectDetail = () => {
                     disabled={leaving}
                   >
                     {leaving ? <Loader size={16} className="spin" /> : <Trash2 size={16} />}
-                    <span>{leaving ? 'Leaving…' : 'Leave project'}</span>
+                    <span>{leaving ? tr('settings.leaveProcessing') : tr('settings.leaveProject')}</span>
                   </button>
                 </div>
               ) : null}
@@ -1675,20 +1675,16 @@ const ProjectDetail = () => {
               const ready = hasLinear || hasTable;
               return (
                 <div className="advanced-tools">
-                  <h3>Advanced</h3>
-                  <p>
-                    Crashing analysis runs the §3 heuristic over critical tasks with{' '}
-                    <code>minDuration</code> and <code>marginalCost</code> set. Requires the
-                    project's <strong>Lost revenue</strong> to have at least one row.
-                  </p>
+                  <h3>{tr('advanced.title')}</h3>
+                  <p>{tr('advanced.crashIntro')}</p>
                   <button
                     type="button"
                     className="btn-secondary"
                     onClick={() => navigate(`/projects/${id}/optimize`)}
                     disabled={!ready}
-                    title={ready ? '' : 'Add a lost-revenue row in Settings to enable'}
+                    title={ready ? '' : tr('advanced.enableHint')}
                   >
-                    Show optimization
+                    {tr('advanced.showOptimization')}
                   </button>
                 </div>
               );
@@ -1696,11 +1692,11 @@ const ProjectDetail = () => {
 
             {isOwner && !project.isPersonal ? (
               <div className="danger-zone">
-                <h3>Danger zone</h3>
-                <p>Deleting the project moves it to trash (hidden from the list).</p>
+                <h3>{tr('settings.dangerZone')}</h3>
+                <p>{tr('settings.dangerZoneNote')}</p>
                 <button className="btn-danger" onClick={handleDelete}>
                   <Trash2 size={16} />
-                  <span>Delete project</span>
+                  <span>{tr('settings.deleteProject')}</span>
                 </button>
               </div>
             ) : null}
@@ -1716,7 +1712,7 @@ const ProjectDetail = () => {
         <div className="modal-overlay" onClick={handleCloseTaskModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editingTaskId ? (editMode ? 'Edit Task' : 'Task') : 'New Task'}</h3>
+              <h3>{editingTaskId ? (editMode ? tr('task.edit') : tr('task.title')) : tr('task.new')}</h3>
               <div className="modal-header-actions">
                 {editingTaskId && editingTaskRef ? (
                   <>
