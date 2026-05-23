@@ -67,6 +67,55 @@ function unitLabel(unit) {
   return TIME_UNIT_SHORT[unit] || 'd';
 }
 
+// Convert a Project doc's lost-revenue fields into the row-editor's state.
+//   - Empty / null:        single empty linear row
+//   - lostRevenueByDuration set: one row per entry, sorted by descending duration
+//   - lostRevenuePerUnit set:   single linear row (no duration), rate = perUnit
+function hydrateLostRevenueRows(p) {
+  if (p?.lostRevenueByDuration && typeof p.lostRevenueByDuration === 'object') {
+    const entries = Object.entries(p.lostRevenueByDuration);
+    if (entries.length > 0) {
+      return entries
+        .map(([d, r]) => ({ duration: String(d), revenue: String(r) }))
+        .sort((a, b) => Number(b.duration) - Number(a.duration));
+    }
+  }
+  if (p?.lostRevenuePerUnit != null && p.lostRevenuePerUnit !== '') {
+    return [{ duration: '', revenue: String(p.lostRevenuePerUnit) }];
+  }
+  return [{ duration: '', revenue: '' }];
+}
+
+// Pack rows into the two backend fields. Returns { lostRevenuePerUnit, lostRevenueByDuration }.
+// Rules: exactly 1 row with no duration → linear; 2+ rows → table; mixed → error.
+function serializeLostRevenue(rows) {
+  const filled = (rows || []).filter((r) => String(r.revenue).trim() !== '');
+  if (filled.length === 0) {
+    return { lostRevenuePerUnit: null, lostRevenueByDuration: null };
+  }
+  if (filled.length === 1 && String(filled[0].duration).trim() === '') {
+    const rev = Number(filled[0].revenue);
+    if (!Number.isFinite(rev) || rev < 0) {
+      throw new Error('Lost revenue rate must be a number >= 0');
+    }
+    return { lostRevenuePerUnit: rev, lostRevenueByDuration: null };
+  }
+  // Table mode: every row needs a duration.
+  const table = {};
+  for (const r of filled) {
+    const d = Number(r.duration);
+    const rev = Number(r.revenue);
+    if (!Number.isFinite(d) || d < 0 || String(r.duration).trim() === '') {
+      throw new Error('Every lost-revenue row needs a duration when there is more than one');
+    }
+    if (!Number.isFinite(rev) || rev < 0) {
+      throw new Error(`Revenue for duration ${d} must be a number >= 0`);
+    }
+    table[String(d)] = rev;
+  }
+  return { lostRevenuePerUnit: null, lostRevenueByDuration: table };
+}
+
 const TABS_BASE = [
   { key: 'board', label: 'Board', icon: LayoutGrid },
   { key: 'list', label: 'List', icon: List },
@@ -105,8 +154,9 @@ const ProjectDetail = () => {
     budgetType: 'hourly',
     timeUnit: 'day',
     maxHeadcount: '',
-    lostRevenuePerUnit: '',
-    lostRevenueByDurationJson: '',
+    // Lost revenue is edited as a list of rows. One row with empty duration =
+    // linear (revenue / unit). 2+ rows = lookup table keyed by duration.
+    lostRevenueRows: [{ duration: '', revenue: '' }],
   });
 
   const [members, setMembers] = useState([]);
@@ -197,10 +247,7 @@ const ProjectDetail = () => {
         budgetType: p.budget?.type || 'hourly',
         timeUnit: p.timeUnit || 'day',
         maxHeadcount: p.maxHeadcount ?? '',
-        lostRevenuePerUnit: p.lostRevenuePerUnit ?? '',
-        lostRevenueByDurationJson: p.lostRevenueByDuration
-          ? JSON.stringify(p.lostRevenueByDuration, null, 2)
-          : '',
+        lostRevenueRows: hydrateLostRevenueRows(p),
       });
     } catch (err) {
       toast.error(err.message || 'Failed to load project');
@@ -364,23 +411,13 @@ const ProjectDetail = () => {
     setSaving(true);
     try {
       const headcountRaw = String(form.maxHeadcount).trim();
-      const lostRevRaw = String(form.lostRevenuePerUnit).trim();
-      const lostRevTableRaw = String(form.lostRevenueByDurationJson || '').trim();
-      let lostRevenueByDuration;
-      if (lostRevTableRaw === '') {
-        lostRevenueByDuration = null;
-      } else {
-        try {
-          const parsed = JSON.parse(lostRevTableRaw);
-          if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
-            throw new Error('must be a JSON object');
-          }
-          lostRevenueByDuration = parsed;
-        } catch (err) {
-          toast.error(`Lost-revenue table is not valid JSON: ${err.message}`);
-          setSaving(false);
-          return;
-        }
+      let lostRevenuePayload;
+      try {
+        lostRevenuePayload = serializeLostRevenue(form.lostRevenueRows);
+      } catch (err) {
+        toast.error(err.message);
+        setSaving(false);
+        return;
       }
       await updateProject(id, {
         name: form.name.trim(),
@@ -394,8 +431,7 @@ const ProjectDetail = () => {
         },
         timeUnit: form.timeUnit || 'day',
         maxHeadcount: headcountRaw === '' ? null : Number(headcountRaw),
-        lostRevenuePerUnit: lostRevRaw === '' ? null : Number(lostRevRaw),
-        lostRevenueByDuration,
+        ...lostRevenuePayload,
       });
       toast.success('Changes saved');
       fetchProject();
@@ -1276,35 +1312,115 @@ const ProjectDetail = () => {
                     disabled={!canManageProject}
                   />
                 </label>
-                <label>
-                  <span>Lost revenue / unit</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="(unset)"
-                    value={form.lostRevenuePerUnit}
-                    onChange={(e) => setForm({ ...form, lostRevenuePerUnit: e.target.value })}
-                    disabled={!canManageProject}
-                  />
-                </label>
               </div>
 
-              <label className="full-width-label">
-                <span>Lost-revenue table (overrides linear)</span>
-                <textarea
-                  className="lost-rev-textarea"
-                  rows={4}
-                  placeholder={'(optional) JSON object keyed by duration, e.g.\n{"16": 20, "15": 15, "14": 10, "13": 6, "12": 3}'}
-                  value={form.lostRevenueByDurationJson}
-                  onChange={(e) => setForm({ ...form, lostRevenueByDurationJson: e.target.value })}
-                  disabled={!canManageProject}
-                />
-                <small className="muted">
-                  When set, used directly by crashing analysis instead of the linear
-                  <code> lostRevenuePerUnit × d</code>. Reproduces study-guide §3.6's tabular cost curve.
-                </small>
-              </label>
+              <fieldset className="lost-rev-editor" disabled={!canManageProject}>
+                <legend>
+                  Lost revenue
+                  <span className="lost-rev-mode-pill">
+                    {form.lostRevenueRows.length <= 1
+                      && String(form.lostRevenueRows[0]?.duration || '').trim() === ''
+                        ? 'linear'
+                        : 'table'}
+                  </span>
+                </legend>
+                <div className="lost-rev-row-list">
+                  {form.lostRevenueRows.length > 1 ? (
+                    <div className="lost-rev-row lost-rev-head">
+                      <span>Duration ({unitLabel(form.timeUnit || 'day')})</span>
+                      <span>Revenue</span>
+                      <span />
+                    </div>
+                  ) : null}
+                  {form.lostRevenueRows.map((row, i) => {
+                    const isSingle = form.lostRevenueRows.length === 1;
+                    return (
+                      <div className="lost-rev-row" key={i}>
+                        {isSingle && String(row.duration || '').trim() === '' ? (
+                          <span className="lost-rev-rate-label">Per unit</span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            className="custom-input"
+                            placeholder="duration"
+                            value={row.duration}
+                            onChange={(e) => {
+                              const next = form.lostRevenueRows.slice();
+                              next[i] = { ...next[i], duration: e.target.value };
+                              setForm({ ...form, lostRevenueRows: next });
+                            }}
+                          />
+                        )}
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="custom-input"
+                          placeholder="revenue"
+                          value={row.revenue}
+                          onChange={(e) => {
+                            const next = form.lostRevenueRows.slice();
+                            next[i] = { ...next[i], revenue: e.target.value };
+                            setForm({ ...form, lostRevenueRows: next });
+                          }}
+                        />
+                        {form.lostRevenueRows.length > 1 ? (
+                          <button
+                            type="button"
+                            className="icon-btn danger"
+                            title="Remove row"
+                            onClick={() => {
+                              const next = form.lostRevenueRows.filter((_, j) => j !== i);
+                              setForm({
+                                ...form,
+                                lostRevenueRows: next.length ? next : [{ duration: '', revenue: '' }],
+                              });
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        ) : (
+                          <span />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="lost-rev-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      // Promote linear → table on first add: copy the existing rate to a sane
+                      // duration row, then queue an empty second row for the user to fill.
+                      const rows = form.lostRevenueRows;
+                      const wasLinear = rows.length === 1
+                        && String(rows[0].duration || '').trim() === '';
+                      if (wasLinear) {
+                        setForm({
+                          ...form,
+                          lostRevenueRows: [
+                            { duration: '', revenue: rows[0].revenue || '' },
+                            { duration: '', revenue: '' },
+                          ],
+                        });
+                      } else {
+                        setForm({
+                          ...form,
+                          lostRevenueRows: [...rows, { duration: '', revenue: '' }],
+                        });
+                      }
+                    }}
+                  >
+                    <Plus size={14} /> Add row
+                  </button>
+                  <small className="muted">
+                    One row with no duration = linear (<code>revenue × d</code>). Two or more rows = lookup table keyed by duration.
+                  </small>
+                </div>
+              </fieldset>
 
               {canManageProject ? (
                 <div className="settings-actions">
@@ -1532,23 +1648,31 @@ const ProjectDetail = () => {
               ) : null}
             </div>
 
-            <div className="advanced-tools">
-              <h3>Advanced</h3>
-              <p>
-                Crashing analysis runs the §3 heuristic over critical tasks with{' '}
-                <code>minDuration</code> and <code>marginalCost</code> set. Requires{' '}
-                <code>project.lostRevenuePerUnit</code>.
-              </p>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => navigate(`/projects/${id}/optimize`)}
-                disabled={project.lostRevenuePerUnit == null}
-                title={project.lostRevenuePerUnit == null ? 'Set lostRevenuePerUnit to enable' : ''}
-              >
-                Show optimization
-              </button>
-            </div>
+            {(() => {
+              const hasLinear = project.lostRevenuePerUnit != null;
+              const hasTable = project.lostRevenueByDuration
+                && Object.keys(project.lostRevenueByDuration).length > 0;
+              const ready = hasLinear || hasTable;
+              return (
+                <div className="advanced-tools">
+                  <h3>Advanced</h3>
+                  <p>
+                    Crashing analysis runs the §3 heuristic over critical tasks with{' '}
+                    <code>minDuration</code> and <code>marginalCost</code> set. Requires the
+                    project's <strong>Lost revenue</strong> to have at least one row.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => navigate(`/projects/${id}/optimize`)}
+                    disabled={!ready}
+                    title={ready ? '' : 'Add a lost-revenue row in Settings to enable'}
+                  >
+                    Show optimization
+                  </button>
+                </div>
+              );
+            })()}
 
             {isOwner && !project.isPersonal ? (
               <div className="danger-zone">

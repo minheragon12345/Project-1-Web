@@ -321,31 +321,88 @@
   margin-bottom: 12px;
 }
 
-.lost-rev-textarea {
-  background-color: var(--surface-primary);
-  border: 1px solid var(--border-secondary);
-  color: var(--text-primary);
-  border-radius: 8px;
-  padding: 8px 12px;
+.lost-rev-editor {
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lost-rev-editor legend {
   font-size: 0.85rem;
-  outline: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  resize: vertical;
-  min-height: 70px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
 }
 
-.lost-rev-textarea:focus {
-  border-color: var(--primary-accent);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+.lost-rev-mode-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: rgba(79, 70, 229, 0.12);
+  color: var(--primary-accent);
 }
 
-.full-width-label small {
+.lost-rev-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lost-rev-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.lost-rev-row.lost-rev-head {
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0 4px;
+}
+
+.lost-rev-rate-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  background-color: var(--surface-secondary);
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.lost-rev-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lost-rev-actions .btn-secondary {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.lost-rev-actions small {
   font-size: 0.75rem;
+  color: var(--text-tertiary);
   line-height: 1.4;
 }
 
-.full-width-label code {
+.lost-rev-actions code {
   background-color: var(--surface-secondary);
   padding: 1px 4px;
   border-radius: 4px;
