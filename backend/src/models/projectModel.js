@@ -80,9 +80,8 @@ const ProjectSchema = new mongoose.Schema(
     },
 
     // Optional non-linear lost-revenue lookup, keyed by project duration in
-    // `timeUnit`s. Reproduces study-guide §3.6's tabular cost curve. When set,
-    // takes precedence over `lostRevenuePerUnit` in /crash-analysis.
-    // Example: { "16": 20, "15": 15, "14": 10, "13": 6, "12": 3 }
+    // `timeUnit`s. When set, takes precedence over `lostRevenuePerUnit` in
+    // /crash-analysis. Example: { "16": 20, "15": 15, "14": 10, "13": 6 }
     lostRevenueByDuration: {
       type: Map,
       of: Number,

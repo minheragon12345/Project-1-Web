@@ -1,14 +1,9 @@
-/*
-  Unit tests for backend/src/services/crashing.js
-  Reproduces project_management_study_guide.md §3.6 synthesis table.
-
-  Run: node src/services/crashing.test.js
-*/
+// Unit tests for crashing.js. Run: node src/services/crashing.test.js
 
 const assert = require('node:assert');
 const { computeCrashingTable } = require('./crashing');
 
-// ----- §3.6 worked example -----
+// Worked example with two critical paths.
 // | Task | Dur | Min | Cost | Pred |
 // | A    | 4   | 2   | 5    | —    |
 // | B    | 6   | 4   | 3    | A    |
@@ -18,8 +13,7 @@ const { computeCrashingTable } = require('./crashing');
 // | F    | 2   | 2   | —    | D,E  |
 //
 // Paths: A→B→D→F = 16, A→C→E→F = 14.
-// Lost-revenue table (§3.6):
-//   16 → 20, 15 → 15, 14 → 10, 13 → 6, 12 → 3
+// Lost-revenue lookup: 16 → 20, 15 → 15, 14 → 10, 13 → 6, 12 → 3.
 
 const tasks = [
   { id: 'A', duration: 4, minDuration: 2, marginalCost: 5, dependencies: [] },
@@ -36,7 +30,7 @@ const lostRevenueFn = (d) => (lostRevTable[d] != null ? lostRevTable[d] : 0);
 
 const { rows, optimalIndex, steps } = computeCrashingTable(tasks, lostRevenueFn);
 
-// Synthesis table per §3.6:
+// Synthesis table — ground truth:
 //   Dur 16 → crash 0  + lost 20 = 20
 //   Dur 15 → crash 2  + lost 15 = 17     (crash D 4→3)
 //   Dur 14 → crash 4  + lost 10 = 14 ←   (crash D 3→2)

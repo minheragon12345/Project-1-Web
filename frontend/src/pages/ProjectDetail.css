@@ -312,6 +312,21 @@
   font-size: 0.78rem;
 }
 
+/* Crashing analysis panel embedded at bottom of Timeline tab.
+   Same surface treatment as .advanced-tools so it nests with the Gantt. */
+.timeline-crashing {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+.timeline-crashing h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
 .full-width-label {
   display: flex;
   flex-direction: column;

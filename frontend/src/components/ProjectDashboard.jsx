@@ -14,13 +14,15 @@ import { Clock, Loader, RefreshCcw } from 'lucide-react';
 import { getBudgetSummary } from '../services/projectService';
 import { listTimeEntries } from '../services/timeEntryService';
 import { getNotes } from '../services/noteService';
+import { useI18n } from '../i18n';
 import './ProjectDashboard.css';
 
-const STATUS_LABELS = {
-  not_done: 'To do',
-  in_progress: 'In progress',
-  done: 'Done',
-  cancelled: 'Cancelled',
+// Status -> i18n key. Resolved at render via t().
+const STATUS_I18N = {
+  not_done: 'board.col.toDo',
+  in_progress: 'board.col.inProgress',
+  done: 'board.col.done',
+  cancelled: 'board.col.cancelled',
 };
 
 function deriveTaskBucket(t) {
@@ -53,6 +55,7 @@ function fmtWeek(d) {
 }
 
 export default function ProjectDashboard({ projectId, currency = 'USD' }) {
+  const { t } = useI18n();
   const [budget, setBudget] = useState(null);
   const [entries, setEntries] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -71,11 +74,11 @@ export default function ProjectDashboard({ projectId, currency = 'USD' }) {
       setEntries(Array.isArray(entriesData?.entries) ? entriesData.entries : []);
       setTasks(Array.isArray(tasksData?.notes) ? tasksData.notes : []);
     } catch (err) {
-      toast.error(err.message || 'Could not load dashboard');
+      toast.error(err.message || t('dash.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -138,68 +141,72 @@ export default function ProjectDashboard({ projectId, currency = 'USD' }) {
   return (
     <div className="dashboard-panel">
       <div className="dashboard-toolbar">
-        <h3>Dashboard</h3>
-        <button className="btn-secondary" onClick={fetchAll} disabled={loading} title="Refresh">
+        <h3>{t('dash.heading')}</h3>
+        <button className="btn-secondary" onClick={fetchAll} disabled={loading} title={t('dash.refresh')}>
           {loading ? <Loader size={14} className="spin" /> : <RefreshCcw size={14} />}
-          <span>Refresh</span>
+          <span>{t('dash.refresh')}</span>
         </button>
       </div>
 
       {loading && entries.length === 0 ? (
         <div className="dashboard-loading">
-          <Loader className="spin" size={24} /> <span>Loading dashboard…</span>
+          <Loader className="spin" size={24} /> <span>{t('dash.loading')}</span>
         </div>
       ) : (
         <>
           <div className="dashboard-cards">
             <div className="dashboard-card">
-              <span className="dashboard-card-label">Total hours logged</span>
+              <span className="dashboard-card-label">{t('dash.totalHoursLogged')}</span>
               <strong>{(budget?.actual?.hours ?? actualHours).toFixed(2)}h</strong>
               <span className="dashboard-card-sub">
-                {(budget?.actual?.billableHours || 0).toFixed(2)}h billable
+                {t('dash.billableSuffix', { hours: (budget?.actual?.billableHours || 0).toFixed(2) })}
               </span>
             </div>
 
             <div className="dashboard-card">
-              <span className="dashboard-card-label">Budget used</span>
+              <span className="dashboard-card-label">{t('dash.budgetUsed')}</span>
               <strong className={usedPercent !== null && usedPercent > 100 ? 'over' : ''}>
                 {usedPercent === null ? '—' : `${usedPercent}%`}
               </strong>
               <span className="dashboard-card-sub">
                 {planned?.amount
-                  ? `${actualCost.toLocaleString()} of ${planned.amount.toLocaleString()} ${planned.currency || currency}`
-                  : 'No budget set'}
+                  ? t('dash.budgetOfPlanned', {
+                      actual: actualCost.toLocaleString(),
+                      planned: planned.amount.toLocaleString(),
+                      currency: planned.currency || currency,
+                    })
+                  : t('dash.noBudget')}
               </span>
             </div>
 
             <div className="dashboard-card">
-              <span className="dashboard-card-label">Estimated vs Actual</span>
+              <span className="dashboard-card-label">{t('dash.estimatedVsActual')}</span>
               <strong>
                 {actualHours.toFixed(2)}h <span className="muted">/ {estimatedHours.toFixed(2)}h</span>
               </strong>
               <span className="dashboard-card-sub">
                 {estimatedHours > 0
-                  ? `${Math.round((actualHours / estimatedHours) * 100)}% of estimate`
-                  : 'No estimates set'}
+                  ? t('dash.pctOfEstimate', { n: Math.round((actualHours / estimatedHours) * 100) })
+                  : t('dash.noEstimates')}
               </span>
             </div>
 
             <div className="dashboard-card">
-              <span className="dashboard-card-label">Remaining</span>
+              <span className="dashboard-card-label">{t('dash.remaining')}</span>
               <strong className={remaining !== null && remaining !== undefined && remaining < 0 ? 'over' : ''}>
                 {remaining === null || remaining === undefined
                   ? '—'
                   : `${remaining.toLocaleString()} ${planned?.currency || currency}`}
               </strong>
               <span className="dashboard-card-sub">
-                {tasks.length} task{tasks.length === 1 ? '' : 's'}
+                {t('dash.tasksCount', { n: tasks.length })}
               </span>
             </div>
           </div>
 
           <div className="dashboard-row">
             <div className="dashboard-section">
-              <h4>Tasks by status</h4>
+              <h4>{t('dash.tasksByStatus')}</h4>
               <div className="status-grid">
                 {['not_done', 'in_progress', 'done', 'cancelled'].map((key) => {
                   const total = tasks.length || 1;
@@ -207,7 +214,7 @@ export default function ProjectDashboard({ projectId, currency = 'USD' }) {
                   const pct = Math.round((count / total) * 100);
                   return (
                     <div className={`status-row col-${key}`} key={key}>
-                      <span className="status-row-label">{STATUS_LABELS[key]}</span>
+                      <span className="status-row-label">{t(STATUS_I18N[key])}</span>
                       <div className="status-row-bar">
                         <div className={`status-row-fill col-${key}`} style={{ width: `${pct}%` }} />
                       </div>
@@ -219,9 +226,9 @@ export default function ProjectDashboard({ projectId, currency = 'USD' }) {
             </div>
 
             <div className="dashboard-section">
-              <h4><Clock size={14} /> Hours per week</h4>
+              <h4><Clock size={14} /> {t('dash.hoursPerWeek')}</h4>
               {burnData.length === 0 ? (
-                <div className="dashboard-empty">No time logged yet.</div>
+                <div className="dashboard-empty">{t('dash.noTimeLogged')}</div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={burnData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
@@ -238,8 +245,8 @@ export default function ProjectDashboard({ projectId, currency = 'USD' }) {
                       labelStyle={{ color: 'var(--text-primary)' }}
                     />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="hours" fill="var(--primary-accent)" name="Total hours" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="billable" fill="#10b981" name="Billable" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="hours" fill="var(--primary-accent)" name={t('dash.totalHours')} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="billable" fill="#10b981" name={t('dash.billable')} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

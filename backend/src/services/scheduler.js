@@ -1,28 +1,6 @@
-/*
-  CPM (Critical Path Method) scheduler — pure functions.
-  Implements the math from project_management_study_guide.md Part 1:
-    - Earliest start (forward pass)
-    - Latest start (backward pass)
-    - Total slack, free slack
-    - Critical path
-
-  No DB, no I/O. Takes plain task objects, returns plain results.
-
-  Input shape:
-    tasks: [{ id, duration, dependencies: [id] }]
-
-  Output of computeSchedule(tasks):
-    {
-      projectDuration: Number,
-      criticalPath: [id, ...],          // one canonical path
-      criticalSet: Set<id>,             // all tasks where totalSlack === 0
-      slacks: Map<id, {
-        ES, EF, LS, LF, totalSlack, freeSlack, isCritical
-      }>
-    }
-
-  Throws Error('Cycle detected in dependency graph') if dependencies form a cycle.
-*/
+// CPM (Critical Path Method) scheduler. Pure functions, no I/O.
+// computeSchedule(tasks) -> { projectDuration, criticalPath, criticalSet, slacks }
+// Throws on dependency cycles.
 
 function buildGraph(tasks) {
   const nodes = new Set();

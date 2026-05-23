@@ -14,11 +14,12 @@ import { GripVertical, Lock, GitBranch } from 'lucide-react';
 import { useI18n } from '../i18n';
 import './KanbanBoard.css';
 
+// `i18n` field is the dictionary key; resolved at render time.
 const BOARD_COLUMNS = [
-  { key: 'not_done', label: 'To do' },
-  { key: 'in_progress', label: 'In progress' },
-  { key: 'done', label: 'Done' },
-  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'not_done', i18n: 'board.col.toDo' },
+  { key: 'in_progress', i18n: 'board.col.inProgress' },
+  { key: 'done', i18n: 'board.col.done' },
+  { key: 'cancelled', i18n: 'board.col.cancelled' },
 ];
 
 const TIME_UNIT_SHORT = { hour: 'h', day: 'd', week: 'w', month: 'mo' };
@@ -170,6 +171,7 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day
 }
 
 function KanbanColumn({ column, tasks, canEdit, onCardClick, isOver, timeUnit, scheduleByTaskId }) {
+  const { t } = useI18n();
   const { setNodeRef } = useDroppable({
     id: column.key,
     data: { type: 'column', columnKey: column.key },
@@ -182,12 +184,12 @@ function KanbanColumn({ column, tasks, canEdit, onCardClick, isOver, timeUnit, s
       data-column={column.key}
     >
       <div className="kanban-column-header">
-        <span className={`kanban-column-title col-${column.key}`}>{column.label}</span>
+        <span className={`kanban-column-title col-${column.key}`}>{t(column.i18n)}</span>
         <span className="board-count">{tasks.length}</span>
       </div>
       <div className="kanban-column-body">
         {tasks.length === 0 ? (
-          <div className="kanban-empty">{canEdit ? 'Drop tasks here' : '—'}</div>
+          <div className="kanban-empty">{canEdit ? t('board.dropHere') : t('board.emptyDash')}</div>
         ) : (
           tasks.map((t) => (
             <KanbanCard

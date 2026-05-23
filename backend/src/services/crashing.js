@@ -1,39 +1,7 @@
-/*
-  Project crashing analysis — pure functions.
-  Implements project_management_study_guide.md §3.4 heuristic:
-
-    1. Compute initial schedule + critical path(s).
-    2. Among critical tasks where currentDuration > minDuration, pick the
-       move with the smallest marginal cost that reduces project duration
-       by 1.
-    3. When more than one path is simultaneously critical, the move must
-       cover ALL critical paths. A shared task hits multiple paths in one
-       reduction; otherwise pick the min-cost combination of tasks (one
-       per critical path).
-    4. Reduce chosen task(s) by 1, recompute the schedule, record a row,
-       repeat until no further crashing is possible.
-
-  Input:
-    tasks: [{
-      id,
-      duration,         // current / baseline
-      minDuration,      // floor; null/undefined => not crashable
-      marginalCost,     // cost per unit of crash; null/undefined => not crashable
-      dependencies: [id]
-    }]
-    lostRevenueFn(duration: number) => number
-      // opportunity cost of finishing at the given duration.
-      // For linear lost-revenue use:  d => perUnit * d
-
-  Output:
-    {
-      rows: [{ duration, cumulativeCrashCost, lostRevenue, totalCost }],
-      optimalIndex,                   // index of min totalCost row
-      steps: [{ from, to, taskIds, cost }]  // crash steps taken
-    }
-
-  Throws on cycle in dependency graph.
-*/
+// Project crashing analysis. Iteratively shortens the critical path one unit
+// at a time, each step picking the cheapest crashable task (or the cheapest
+// combination when multiple paths are simultaneously critical).
+// Returns rows + optimalIndex + steps. Throws on dependency cycle.
 
 const { buildGraph, computeSchedule } = require('./scheduler');
 

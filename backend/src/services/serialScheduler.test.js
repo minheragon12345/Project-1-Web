@@ -1,15 +1,10 @@
-/*
-  Unit tests for backend/src/services/serialScheduler.js
-  Derived from project_management_study_guide.md §2.8 worked example.
-
-  Run: node src/services/serialScheduler.test.js
-*/
+// Unit tests for serialScheduler.js. Run: node src/services/serialScheduler.test.js
 
 const assert = require('node:assert');
 const { computeSchedule } = require('./scheduler');
 const { serialSchedule } = require('./serialScheduler');
 
-// ----- §2.8 example -----
+// Worked example with known ground-truth constrained schedule.
 // | Task | Dur | Pred  | People |
 // | A    | 2   | —     | 4      |
 // | B    | 3   | —     | 3      |

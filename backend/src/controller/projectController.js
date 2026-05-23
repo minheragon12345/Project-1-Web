@@ -872,7 +872,7 @@ router.get('/:id/audit-log', async (req, res) => {
 
 // CPM schedule: forward/backward pass over the project's dependency graph.
 // Returns earliest/latest dates, slacks, and the critical path.
-// Query: ?constrained=true → re-runs the serial-method scheduler (§2.7)
+// Query: ?constrained=true → re-runs the serial-method scheduler
 //   under project.maxHeadcount and overrides ES/EF in the response.
 router.get('/:id/schedule', async (req, res) => {
   const { id } = req.params;
@@ -1038,14 +1038,13 @@ router.get('/:id/resource-curve', async (req, res) => {
   }
 });
 
-// Crashing analysis (§3 of the study guide). Iteratively reduces critical-path
-// tasks by 1 unit, lowest marginalCost first, recomputes the schedule each
-// step. Reports the synthesis table with the totalCost-minimizing row flagged.
+// Crashing analysis. Iteratively reduces critical-path tasks by 1 unit,
+// lowest marginalCost first, recomputes the schedule each step. Reports the
+// synthesis table with the totalCost-minimizing row flagged.
 //
 // Lost-revenue curve: prefers project.lostRevenueByDuration (Map<duration,
-// revenue>) when set — this matches §3.6's non-linear lookup table exactly.
-// Falls back to project.lostRevenuePerUnit * d (linear) otherwise.
-// At least one of the two must be set.
+// revenue>) for non-linear lookup. Falls back to project.lostRevenuePerUnit
+// * d (linear) otherwise. At least one of the two must be set.
 router.get('/:id/crash-analysis', async (req, res) => {
   const { id } = req.params;
 

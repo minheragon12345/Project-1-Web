@@ -59,6 +59,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 const ProjectGantt = lazy(() => import('../components/ProjectGantt'));
 const ResourceCurve = lazy(() => import('../components/ResourceCurve'));
+import CrashingAnalysis from '../components/CrashingAnalysis';
 import { useTheme } from '../hooks/useTheme';
 import { useI18n } from '../i18n';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -881,18 +882,16 @@ const ProjectDetail = () => {
         {tab === 'board' ? (
           <div className="board-preview">
             <div className="board-preview-header">
-              <p className="board-preview-note">
-                Drag a card into a column to change its status. Click a card to edit it.
-              </p>
+              <p className="board-preview-note">{tr('board.hint')}</p>
               {canEdit ? (
                 <button className="btn-primary" onClick={handleOpenCreateTask}>
                   <Plus size={16} />
-                  <span>New task</span>
+                  <span>{tr('board.newTask')}</span>
                 </button>
               ) : null}
             </div>
             {tasksLoading ? (
-              <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading…</span></div>
+              <div className="projects-loading"><Loader className="spin" size={24} /> <span>{tr('common.loading')}</span></div>
             ) : (
               <KanbanBoard
                 tasks={tasks}
@@ -905,7 +904,7 @@ const ProjectDetail = () => {
             )}
           </div>
         ) : tab === 'dashboard' ? (
-          <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading dashboard…</span></div>}>
+          <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>{tr('dash.loading')}</span></div>}>
             <ProjectDashboard projectId={id} currency={form.budgetCurrency || 'USD'} />
           </Suspense>
         ) : tab === 'timeline' ? (
@@ -1000,7 +999,7 @@ const ProjectDetail = () => {
               </div>
             ) : (
               <ErrorBoundary label="Gantt failed to render">
-                <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading Gantt…</span></div>}>
+                <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>{tr('common.loading')}</span></div>}>
                   <ProjectGantt
                     schedule={schedule}
                     projectStart={project?.startDate || new Date()}
@@ -1024,6 +1023,22 @@ const ProjectDetail = () => {
                 </Suspense>
               </ErrorBoundary>
             ) : null}
+
+            {(() => {
+              const hasLinear = project?.lostRevenuePerUnit != null;
+              const hasTable = project?.lostRevenueByDuration
+                && Object.keys(project.lostRevenueByDuration).length > 0;
+              const ready = hasLinear || hasTable;
+              if (!ready) return null;
+              return (
+                <div className="timeline-crashing">
+                  <h3>{tr('opt.heading')}</h3>
+                  <ErrorBoundary label="Crashing analysis failed to render">
+                    <CrashingAnalysis projectId={id} project={project} refreshKey={tasks.length} />
+                  </ErrorBoundary>
+                </div>
+              );
+            })()}
           </div>
         ) : tab === 'list' ? (
           (() => {
@@ -1040,14 +1055,15 @@ const ProjectDetail = () => {
           <div className="task-list-panel">
             <div className="task-list-header">
               <h3>
-                {listTrashView ? 'Trash' : 'Tasks in this project'} ({visibleTasks.length})
+                {listTrashView ? tr('list.trash') : tr('list.heading', { n: visibleTasks.length })}
+                {listTrashView ? ` (${visibleTasks.length})` : ''}
               </h3>
               <div className="task-list-actions">
                 <div className="task-list-search">
                   <Search size={14} />
                   <input
                     type="text"
-                    placeholder="Search title / content…"
+                    placeholder={tr('list.search')}
                     value={listSearch}
                     onChange={(e) => setListSearch(e.target.value)}
                   />
@@ -1056,21 +1072,21 @@ const ProjectDetail = () => {
                   type="button"
                   className={`btn-secondary ${listTrashView ? 'active' : ''}`}
                   onClick={() => setListTrashView((v) => !v)}
-                  title="Toggle trash view"
+                  title={tr('list.trash')}
                 >
                   {listTrashView ? <List size={14} /> : <Trash2 size={14} />}
-                  <span>{listTrashView ? 'Active' : 'Trash'}</span>
+                  <span>{listTrashView ? tr('list.exitTrash') : tr('list.trash')}</span>
                 </button>
                 {canEdit && !listTrashView ? (
                   <button className="btn-primary" onClick={handleOpenCreateTask}>
                     <Plus size={16} />
-                    <span>New task</span>
+                    <span>{tr('board.newTask')}</span>
                   </button>
                 ) : null}
               </div>
             </div>
             {isLoading ? (
-              <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading…</span></div>
+              <div className="projects-loading"><Loader className="spin" size={24} /> <span>{tr('common.loading')}</span></div>
             ) : visibleTasks.length === 0 ? (
               <div className="tab-placeholder">
                 {listTrashView ? <Trash2 size={40} /> : <List size={40} />}
@@ -1114,7 +1130,7 @@ const ProjectDetail = () => {
                       />
                       <div className="task-main">
                         <div className="task-title">
-                          {t.title || <span className="task-placeholder">(no title)</span>}
+                          {t.title || <span className="task-placeholder">{tr('common.noTitle')}</span>}
                         </div>
                         <div className="task-sub">
                           {(() => {
@@ -1122,46 +1138,46 @@ const ProjectDetail = () => {
                             if (!sched) return null;
                             if (sched.isCritical) {
                               return (
-                                <span className="critical-chip" title="On critical path">
-                                  Critical
+                                <span className="critical-chip" title={tr('chip.criticalFull')}>
+                                  {tr('chip.criticalFull')}
                                 </span>
                               );
                             }
                             if (sched.totalSlack > 0) {
                               return (
-                                <span className="slack-chip" title="Total slack">
-                                  slack: {sched.totalSlack}{unitLabel(project?.timeUnit || 'day')}
+                                <span className="slack-chip" title={tr('chip.slack', { n: sched.totalSlack, unit: unitLabel(project?.timeUnit || 'day') })}>
+                                  {tr('chip.slack', { n: sched.totalSlack, unit: unitLabel(project?.timeUnit || 'day') })}
                                 </span>
                               );
                             }
                             return null;
                           })()}
                           {t.duration > 0 ? (
-                            <span className="duration-chip" title="Duration">
-                              Dur: {t.duration}{unitLabel(project?.timeUnit || 'day')}
+                            <span className="duration-chip" title={tr('task.duration')}>
+                              {tr('chip.duration', { n: t.duration, unit: unitLabel(project?.timeUnit || 'day') })}
                             </span>
                           ) : null}
                           {t.peopleRequired > 1 ? (
-                            <span className="people-chip" title="People required">
-                              👥 {t.peopleRequired}
+                            <span className="people-chip" title={tr('task.peopleRequired')}>
+                              {tr('chip.people', { n: t.peopleRequired })}
                             </span>
                           ) : null}
                           {t.isBlocked ? (
-                            <span className="blocked-chip" title="Blocked by dependencies">
-                              <Lock size={10} /> Blocked
+                            <span className="blocked-chip" title={tr('chip.blocked')}>
+                              <Lock size={10} /> {tr('chip.blocked')}
                             </span>
                           ) : null}
                           {t.subtaskStats?.total > 0 ? (
-                            <span className="subtask-mini" title="Subtasks done / total">
-                              <GitBranch size={10} /> {t.subtaskStats.done}/{t.subtaskStats.total}
+                            <span className="subtask-mini" title={tr('task.subtasks')}>
+                              <GitBranch size={10} /> {tr('chip.subtaskCount', { done: t.subtaskStats.done, total: t.subtaskStats.total })}
                             </span>
                           ) : null}
                           {t.deadline ? (
                             <span className={overdue ? 'overdue-text' : ''}>
-                              Due: {new Date(t.deadline).toLocaleDateString('vi-VN')}
+                              {tr('list.deadlinePrefix', { date: new Date(t.deadline).toLocaleDateString('vi-VN') })}
                             </span>
                           ) : (
-                            <span className="muted">No deadline</span>
+                            <span className="muted">{tr('list.noDeadline')}</span>
                           )}
                           {Array.isArray(t.assignees) && t.assignees.length > 0 ? (
                             <span className="assignees-row">
@@ -1175,7 +1191,7 @@ const ProjectDetail = () => {
                               ) : null}
                             </span>
                           ) : (
-                            <span className="muted">Unassigned</span>
+                            <span className="muted">{tr('list.unassigned')}</span>
                           )}
                           {t.owner?.username ? <span className="muted">• {t.owner.username}</span> : null}
                         </div>

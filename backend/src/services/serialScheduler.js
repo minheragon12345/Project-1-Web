@@ -1,39 +1,10 @@
-/*
-  Serial-method scheduler — pure functions.
-  Implements project_management_study_guide.md §2.7:
-
-    1. t = 0
-    2. List executable tasks (predecessors all completed, currently pending)
-    3. Sort by smallest ES → smallest LS → smallest duration (priority rule from §2.7)
-    4. Start tasks in that order as long as remainingHeadcount >= peopleRequired
-    5. Advance t to next event (the smallest end-time among running tasks)
-    6. Move finished tasks from running → completed; release headcount
-    7. Repeat until pending and running are both empty
-
-  Input shape:
-    tasks: [{
-      id,
-      duration,
-      dependencies: [id],
-      peopleRequired,
-      ES,       // from the unconstrained schedule — used for tie-break
-      LS,       // from the unconstrained schedule — used for tie-break
-    }]
-    maxHeadcount: Number
-
-  Output:
-    {
-      projectDuration: Number,
-      tasks: [{ id, ES, EF, peopleRequired }]   // constrained ES/EF
-    }
-
-  Throws:
-    Error('Task <id> needs N people but cap is M') — if any task can never run
-    Error('Deadlock: ...')                          — if executable set is non-empty but nothing fits AND nothing running (shouldn't happen given the above check)
-*/
+// Serial-method resource-constrained scheduler. Pure functions, no I/O.
+// Greedy: each step pick executable tasks sorted by (ES, LS, duration) and
+// start as many as fit under maxHeadcount, then advance time to the next
+// finishing event. Returns constrained schedule.
 
 function sortByPriority(executable) {
-  // §2.7: smallest ES → smallest LS → smallest duration
+  // Priority rule: smallest ES, then smallest LS, then smallest duration.
   return executable.slice().sort((a, b) => {
     if (a.ES !== b.ES) return a.ES - b.ES;
     if (a.LS !== b.LS) return a.LS - b.LS;
