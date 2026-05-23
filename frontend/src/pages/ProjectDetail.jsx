@@ -59,6 +59,8 @@ const ProjectDashboard = lazy(() => import('../components/ProjectDashboard'));
 const ProjectGantt = lazy(() => import('../components/ProjectGantt'));
 const ResourceCurve = lazy(() => import('../components/ResourceCurve'));
 import { useTheme } from '../hooks/useTheme';
+import { useI18n } from '../i18n';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useSchedule } from '../hooks/useSchedule';
 import './ProjectDetail.css';
 
@@ -116,15 +118,16 @@ function serializeLostRevenue(rows) {
   return { lostRevenuePerUnit: null, lostRevenueByDuration: table };
 }
 
+// Tabs carry an i18n key. Render-time lookup via t('tab.<key>').
 const TABS_BASE = [
-  { key: 'board', label: 'Board', icon: LayoutGrid },
-  { key: 'list', label: 'List', icon: List },
-  { key: 'timeline', label: 'Timeline', icon: GanttChart },
-  { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-  { key: 'settings', label: 'Settings', icon: Settings },
+  { key: 'board', icon: LayoutGrid },
+  { key: 'list', icon: List },
+  { key: 'timeline', icon: GanttChart },
+  { key: 'dashboard', icon: BarChart3 },
+  { key: 'settings', icon: Settings },
 ];
 
-const LOG_TAB = { key: 'log', label: 'Log', icon: ScrollText };
+const LOG_TAB = { key: 'log', icon: ScrollText };
 
 const MEMBER_ROLE_OPTIONS = [
   { value: 'moderator', label: 'Moderator (edit + view log)' },
@@ -137,6 +140,10 @@ const MEMBER_ROLE_OPTIONS = [
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  // Aliased to `tr` because this file uses the identifier `t` for task variables
+  // inside .map / .find arrow bodies (e.g. `tasks.map((t) => ...)`). Keeping the
+  // i18n function on its own name avoids accidental shadowing inside callbacks.
+  const { t: tr } = useI18n();
 
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -801,7 +808,7 @@ const ProjectDetail = () => {
       <div className="project-detail-header">
         <button className="btn-secondary" onClick={() => navigate('/projects')}>
           <ArrowLeft size={16} />
-          <span>Back</span>
+          <span>{tr('common.back')}</span>
         </button>
 
         <div className="project-title-block">
@@ -816,14 +823,15 @@ const ProjectDetail = () => {
             <span className={`project-role role-${project.role}`}>{project.role}</span>
             <span className="project-sub-dot">•</span>
             <span>
-              Project owner: <strong>{project.owner?.username || project.owner?.email || '—'}</strong>
+              {tr('header.owner')} <strong>{project.owner?.username || project.owner?.email || '—'}</strong>
             </span>
             <span className="project-sub-dot">•</span>
-            <span>Members: {members?.length || project.members?.length || 0}</span>
+            <span>{tr('header.members')} {members?.length || project.members?.length || 0}</span>
           </div>
         </div>
 
         <div className="action-buttons">
+          <LanguageSwitcher />
           <button className="icon-btn" onClick={toggleTheme} title={`Theme: ${themePref}`}>
             {themePref === 'light' ? (
               <Sun size={18} />
@@ -836,7 +844,7 @@ const ProjectDetail = () => {
           {isOwner && !project.isPersonal ? (
             <button className="btn-secondary" onClick={handleArchive}>
               <Archive size={16} />
-              <span>{project.status === 'archived' ? 'Restore' : 'Archive'}</span>
+              <span>{project.status === 'archived' ? tr('common.restore') : tr('common.archive')}</span>
             </button>
           ) : null}
           <button
@@ -850,20 +858,20 @@ const ProjectDetail = () => {
             title="Sign out"
           >
             <LogOut size={16} />
-            <span>Logout</span>
+            <span>{tr('common.logout')}</span>
           </button>
         </div>
       </div>
 
       <div className="project-tabs">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {TABS.map(({ key, icon: Icon }) => (
           <button
             key={key}
             className={`tab ${tab === key ? 'active' : ''}`}
             onClick={() => setTab(key)}
           >
             <Icon size={16} />
-            <span>{label}</span>
+            <span>{tr('tab.' + key)}</span>
           </button>
         ))}
       </div>
@@ -908,25 +916,25 @@ const ProjectDetail = () => {
                   className={ganttBarMode === 'Earliest' ? 'active' : ''}
                   onClick={() => setGanttBarMode('Earliest')}
                 >
-                  Earliest start
+                  {tr('gantt.earliestStart')}
                 </button>
                 <button
                   type="button"
                   className={ganttBarMode === 'Latest' ? 'active' : ''}
                   onClick={() => setGanttBarMode('Latest')}
                 >
-                  Latest start
+                  {tr('gantt.latestStart')}
                 </button>
               </div>
               <div className="toggle-group" role="group" aria-label="View granularity">
-                {['Day', 'Week', 'Month'].map((m) => (
+                {[['Day', 'gantt.day'], ['Week', 'gantt.week'], ['Month', 'gantt.month']].map(([m, key]) => (
                   <button
                     key={m}
                     type="button"
                     className={ganttGranularity === m ? 'active' : ''}
                     onClick={() => setGanttGranularity(m)}
                   >
-                    {m}
+                    {t(key)}
                   </button>
                 ))}
               </div>
@@ -934,14 +942,14 @@ const ProjectDetail = () => {
                 className="toggle-group"
                 role="group"
                 aria-label="Resource mode"
-                title={project?.maxHeadcount == null ? 'Set Project.maxHeadcount in Settings to enable constrained mode' : ''}
+                title={project?.maxHeadcount == null ? tr('gantt.enableConstrainedHint') : ''}
               >
                 <button
                   type="button"
                   className={!constrainedMode ? 'active' : ''}
                   onClick={() => setConstrainedMode(false)}
                 >
-                  Unlimited
+                  {tr('gantt.unlimited')}
                 </button>
                 <button
                   type="button"
@@ -949,17 +957,19 @@ const ProjectDetail = () => {
                   onClick={() => setConstrainedMode(true)}
                   disabled={project?.maxHeadcount == null}
                 >
-                  Constrained{project?.maxHeadcount != null ? ` (≤${project.maxHeadcount})` : ''}
+                  {project?.maxHeadcount != null
+                    ? tr('gantt.constrainedCap', { cap: project.maxHeadcount })
+                    : tr('gantt.constrained')}
                 </button>
               </div>
               <div className="gantt-header-info">
                 {schedule ? (
                   <>
                     <span>
-                      Duration: <strong>{schedule.projectDuration}{unitLabel(schedule.timeUnit || 'day')}</strong>
+                      {tr('gantt.duration')} <strong>{schedule.projectDuration}{unitLabel(schedule.timeUnit || 'day')}</strong>
                     </span>
                     <span>
-                      Critical: <strong>{schedule.criticalPath?.length || 0} tasks</strong>
+                      {tr('gantt.critical')} <strong>{tr('gantt.criticalTasks', { n: schedule.criticalPath?.length || 0 })}</strong>
                     </span>
                   </>
                 ) : null}
@@ -967,20 +977,25 @@ const ProjectDetail = () => {
             </div>
             {constrainedMode && schedule && schedule.mode === 'constrained' && schedule.delay > 0 ? (
               <div className="gantt-banner">
-                Headcount cap of {schedule.maxHeadcount} delays project by {schedule.delay}
-                {unitLabel(schedule.timeUnit || 'day')} (was {schedule.unconstrainedDuration}, now {schedule.projectDuration}).
+                {tr('gantt.delayBanner', {
+                  cap: schedule.maxHeadcount,
+                  delay: schedule.delay,
+                  unit: unitLabel(schedule.timeUnit || 'day'),
+                  was: schedule.unconstrainedDuration,
+                  now: schedule.projectDuration,
+                })}
               </div>
             ) : null}
             {constrainedMode && scheduleError ? (
               <div className="gantt-banner error">
-                Constrained schedule failed: {scheduleError}
+                {tr('gantt.constrainedFailed', { msg: scheduleError })}
               </div>
             ) : null}
             {tasksLoading || !schedule ? (
-              <div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading schedule…</span></div>
+              <div className="projects-loading"><Loader className="spin" size={24} /> <span>{tr('common.loading')}</span></div>
             ) : (schedule?.tasks?.length || 0) === 0 ? (
               <div className="gantt-empty">
-                No tasks with duration yet. Add tasks with <code>duration</code> &gt; 0 to see the Gantt.
+                {tr('gantt.empty')}
               </div>
             ) : (
               <Suspense fallback={<div className="projects-loading"><Loader className="spin" size={24} /> <span>Loading Gantt…</span></div>}>
@@ -1292,21 +1307,21 @@ const ProjectDetail = () => {
 
               <div className="form-row">
                 <label>
-                  <span>Time unit</span>
+                  <span>{tr('settings.timeUnit')}</span>
                   <select value={form.timeUnit} onChange={(e) => setForm({ ...form, timeUnit: e.target.value })} disabled={!canManageProject}>
-                    <option value="hour">Hour</option>
-                    <option value="day">Day</option>
-                    <option value="week">Week</option>
-                    <option value="month">Month</option>
+                    <option value="hour">{tr('settings.timeUnit.hour')}</option>
+                    <option value="day">{tr('settings.timeUnit.day')}</option>
+                    <option value="week">{tr('settings.timeUnit.week')}</option>
+                    <option value="month">{tr('settings.timeUnit.month')}</option>
                   </select>
                 </label>
                 <label>
-                  <span>Max headcount</span>
+                  <span>{tr('settings.maxHeadcount')}</span>
                   <input
                     type="number"
                     min="1"
                     step="1"
-                    placeholder="(unset)"
+                    placeholder={tr('common.unset')}
                     value={form.maxHeadcount}
                     onChange={(e) => setForm({ ...form, maxHeadcount: e.target.value })}
                     disabled={!canManageProject}
@@ -1316,19 +1331,19 @@ const ProjectDetail = () => {
 
               <fieldset className="lost-rev-editor" disabled={!canManageProject}>
                 <legend>
-                  Lost revenue
+                  {tr('settings.lostRevenue')}
                   <span className="lost-rev-mode-pill">
                     {form.lostRevenueRows.length <= 1
                       && String(form.lostRevenueRows[0]?.duration || '').trim() === ''
-                        ? 'linear'
-                        : 'table'}
+                        ? tr('settings.lostRevMode.linear')
+                        : tr('settings.lostRevMode.table')}
                   </span>
                 </legend>
                 <div className="lost-rev-row-list">
                   {form.lostRevenueRows.length > 1 ? (
                     <div className="lost-rev-row lost-rev-head">
-                      <span>Duration ({unitLabel(form.timeUnit || 'day')})</span>
-                      <span>Revenue</span>
+                      <span>{tr('settings.lostRev.duration', { unit: unitLabel(form.timeUnit || 'day') })}</span>
+                      <span>{tr('settings.lostRev.revenue')}</span>
                       <span />
                     </div>
                   ) : null}
@@ -1337,7 +1352,7 @@ const ProjectDetail = () => {
                     return (
                       <div className="lost-rev-row" key={i}>
                         {isSingle && String(row.duration || '').trim() === '' ? (
-                          <span className="lost-rev-rate-label">Per unit</span>
+                          <span className="lost-rev-rate-label">{tr('settings.lostRev.perUnit')}</span>
                         ) : (
                           <input
                             type="number"
@@ -1414,10 +1429,10 @@ const ProjectDetail = () => {
                       }
                     }}
                   >
-                    <Plus size={14} /> Add row
+                    <Plus size={14} /> {tr('settings.lostRev.addRow')}
                   </button>
                   <small className="muted">
-                    One row with no duration = linear (<code>revenue × d</code>). Two or more rows = lookup table keyed by duration.
+                    {tr('settings.lostRev.hint')}
                   </small>
                 </div>
               </fieldset>
@@ -1750,7 +1765,7 @@ const ProjectDetail = () => {
             <fieldset disabled={taskReadOnly} style={{ border: 'none', padding: 0, margin: 0 }}>
               <div className="form-row">
                 <div className="form-group half">
-                  <label>Duration ({unitLabel(project?.timeUnit || 'day')})</label>
+                  <label>{tr('task.duration')} ({unitLabel(project?.timeUnit || 'day')})</label>
                   <input
                     type="number"
                     className="custom-input"
@@ -1763,7 +1778,7 @@ const ProjectDetail = () => {
                 </div>
 
                 <div className="form-group half">
-                  <label>People required</label>
+                  <label>{tr('task.peopleRequired')}</label>
                   <input
                     type="number"
                     className="custom-input"
@@ -1778,8 +1793,8 @@ const ProjectDetail = () => {
 
               <div className="form-row">
                 <div className="form-group half">
-                  <label title="Floor for crashing analysis (§3). Leave empty to mark task as non-crashable.">
-                    Min duration ({unitLabel(project?.timeUnit || 'day')}) - optional
+                  <label title={tr('task.minDurationHint')}>
+                    {tr('task.minDuration')} ({unitLabel(project?.timeUnit || 'day')}) — {tr('common.optional')}
                   </label>
                   <input
                     type="number"
@@ -1787,22 +1802,22 @@ const ProjectDetail = () => {
                     min={0}
                     max={100000}
                     step={0.5}
-                    placeholder="(empty = not crashable)"
+                    placeholder={tr('task.notCrashable')}
                     value={taskForm.minDuration}
                     onChange={(e) => setTaskForm({ ...taskForm, minDuration: e.target.value })}
                   />
                 </div>
 
                 <div className="form-group half">
-                  <label title="Cost per unit of crash. Used by crashing analysis (§3) to pick cheapest task to shorten.">
-                    Marginal cost / unit - optional
+                  <label title={tr('task.marginalCostHint')}>
+                    {tr('task.marginalCost')} — {tr('common.optional')}
                   </label>
                   <input
                     type="number"
                     className="custom-input"
                     min={0}
                     step={0.01}
-                    placeholder="(empty = not crashable)"
+                    placeholder={tr('task.notCrashable')}
                     value={taskForm.marginalCost}
                     onChange={(e) => setTaskForm({ ...taskForm, marginalCost: e.target.value })}
                   />
@@ -1944,9 +1959,9 @@ const ProjectDetail = () => {
             {!editingTaskId ? (
               <section className="task-precreate-relations">
                 <div className="precreate-block">
-                  <h4>Blocked by ({pendingBlockers.length})</h4>
+                  <h4>{tr('task.blockedBy')} ({pendingBlockers.length})</h4>
                   {pendingBlockers.length === 0 ? (
-                    <div className="muted small">No blockers selected.</div>
+                    <div className="muted small">{tr('task.noBlockers')}</div>
                   ) : (
                     <div className="pending-chip-row">
                       {pendingBlockers.map((b) => (
@@ -1967,7 +1982,7 @@ const ProjectDetail = () => {
                   <input
                     type="text"
                     className="custom-input"
-                    placeholder="Search project tasks to add as blocker…"
+                    placeholder={tr('task.searchBlocker')}
                     value={blockerQuery}
                     onChange={(e) => setBlockerQuery(e.target.value)}
                   />
@@ -2010,9 +2025,9 @@ const ProjectDetail = () => {
                 </div>
 
                 <div className="precreate-block">
-                  <h4>Subtasks ({pendingSubtasks.length})</h4>
+                  <h4>{tr('task.subtasks')} ({pendingSubtasks.length})</h4>
                   {pendingSubtasks.length === 0 ? (
-                    <div className="muted small">No subtasks queued.</div>
+                    <div className="muted small">{tr('task.noSubtasks')}</div>
                   ) : (
                     <ul className="pending-sub-list">
                       {pendingSubtasks.map((s, i) => (
@@ -2037,14 +2052,14 @@ const ProjectDetail = () => {
                     <input
                       type="text"
                       className="custom-input"
-                      placeholder="Subtask title (optional)"
+                      placeholder={tr('task.subtask.title')}
                       value={newSubtaskDraft.title}
                       onChange={(e) => setNewSubtaskDraft({ ...newSubtaskDraft, title: e.target.value })}
                     />
                     <input
                       type="text"
                       className="custom-input"
-                      placeholder="Subtask content (required)"
+                      placeholder={tr('task.subtask.content')}
                       value={newSubtaskDraft.content}
                       onChange={(e) => setNewSubtaskDraft({ ...newSubtaskDraft, content: e.target.value })}
                       onKeyDown={(e) => {
@@ -2070,11 +2085,11 @@ const ProjectDetail = () => {
                         setNewSubtaskDraft({ title: '', content: '' });
                       }}
                     >
-                      <Plus size={14} /> Add
+                      <Plus size={14} /> {tr('common.add')}
                     </button>
                   </div>
                   <small className="muted">
-                    Subtasks and blockers are saved after the parent task is created.
+                    {tr('task.precreateNote')}
                   </small>
                 </div>
               </section>

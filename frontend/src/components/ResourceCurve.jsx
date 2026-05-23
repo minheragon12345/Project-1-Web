@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { getResourceCurve } from '../services/projectService';
+import { useI18n } from '../i18n';
 import './ResourceCurve.css';
 
 const UNIT_LABEL = { hour: 'h', day: 'd', week: 'w', month: 'mo' };
@@ -23,6 +24,7 @@ const UNIT_LABEL = { hour: 'h', day: 'd', week: 'w', month: 'mo' };
  *   refreshKey — optional value; when it changes, refetch (e.g. on task save)
  */
 export default function ResourceCurve({ projectId, refreshKey }) {
+  const { t } = useI18n();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -67,13 +69,13 @@ export default function ResourceCurve({ projectId, refreshKey }) {
 
   if (!projectId) return null;
   if (loading && !data) {
-    return <div className="resource-curve-empty">Loading resource curve…</div>;
+    return <div className="resource-curve-empty">{t('rc.loading')}</div>;
   }
   if (error) {
-    return <div className="resource-curve-empty error">Resource curve: {error}</div>;
+    return <div className="resource-curve-empty error">{t('rc.failed', { msg: error })}</div>;
   }
   if (!data || chartData.length === 0) {
-    return <div className="resource-curve-empty">No resource data yet.</div>;
+    return <div className="resource-curve-empty">{t('rc.empty')}</div>;
   }
 
   const peak = Number(data.peak) || 0;
@@ -84,17 +86,17 @@ export default function ResourceCurve({ projectId, refreshKey }) {
     <div className="resource-curve-wrapper">
       <div className="resource-curve-header">
         <div className="rc-stat">
-          <span className="rc-label">Peak demand</span>
+          <span className="rc-label">{t('rc.peak')}</span>
           <span className={`rc-value ${overPeak ? 'rc-over' : ''}`}>
-            {peak} {peak === 1 ? 'person' : 'people'}
+            {peak} {t('rc.peopleAxis')}
           </span>
         </div>
         <div className="rc-stat">
-          <span className="rc-label">Cap</span>
+          <span className="rc-label">{t('rc.cap')}</span>
           <span className="rc-value">{reference}</span>
         </div>
         <div className="rc-stat">
-          <span className="rc-label">Span</span>
+          <span className="rc-label">{t('rc.span')}</span>
           <span className="rc-value">
             {data.projectDuration}
             {unitShort}
@@ -102,7 +104,7 @@ export default function ResourceCurve({ projectId, refreshKey }) {
         </div>
         {overPeak ? (
           <div className="rc-alert">
-            Peak demand exceeds cap by {peak - reference}.
+            {t('rc.exceeds', { n: peak - reference })}
           </div>
         ) : null}
       </div>
@@ -119,7 +121,7 @@ export default function ResourceCurve({ projectId, refreshKey }) {
               stroke="var(--text-secondary, #4b5563)"
               tick={{ fontSize: 12 }}
               label={{
-                value: `time (${unitShort})`,
+                value: t('rc.timeAxis', { unit: unitShort }),
                 position: 'insideBottom',
                 offset: -8,
                 style: { fill: 'var(--text-tertiary, #9ca3af)', fontSize: 11 },
@@ -130,7 +132,7 @@ export default function ResourceCurve({ projectId, refreshKey }) {
               tick={{ fontSize: 12 }}
               allowDecimals={false}
               label={{
-                value: 'people',
+                value: t('rc.peopleAxis'),
                 angle: -90,
                 position: 'insideLeft',
                 style: { fill: 'var(--text-tertiary, #9ca3af)', fontSize: 11 },
@@ -143,11 +145,11 @@ export default function ResourceCurve({ projectId, refreshKey }) {
                 fontSize: 12,
               }}
               formatter={(value, name) => {
-                if (name === 'safe') return [value, 'within cap'];
-                if (name === 'over') return [value, 'over cap'];
+                if (name === 'safe') return [value, t('rc.withinCap')];
+                if (name === 'over') return [value, t('rc.overCap')];
                 return [value, name];
               }}
-              labelFormatter={(t) => `t = ${t}${unitShort}`}
+              labelFormatter={(tt) => `t = ${tt}${unitShort}`}
             />
             <ReferenceLine
               y={reference}

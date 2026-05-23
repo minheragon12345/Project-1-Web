@@ -11,6 +11,7 @@ import ProjectOptimize from './pages/ProjectOptimize';
 import MyTime from './pages/MyTime';
 import Reports from './pages/Reports';
 import { me } from './services/authService';
+import { LanguageProvider } from './i18n';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
@@ -56,6 +57,7 @@ function App() {
   }, [user]);
 
   return (
+    <LanguageProvider>
     <Router>
       <ToastContainer position="top-right" autoClose={3000} />
       <Routes>
@@ -88,6 +90,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </LanguageProvider>
   );
 }
 

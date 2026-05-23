@@ -11,6 +11,7 @@ import {
   closestCorners,
 } from '@dnd-kit/core';
 import { GripVertical, Lock, GitBranch } from 'lucide-react';
+import { useI18n } from '../i18n';
 import './KanbanBoard.css';
 
 const BOARD_COLUMNS = [
@@ -54,6 +55,7 @@ function patchForColumn(targetCol, task) {
 }
 
 function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day', schedule = null }) {
+  const { t } = useI18n();
   const id = String(task._id || task.id);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id,
@@ -107,32 +109,32 @@ function KanbanCard({ task, canEdit, onClick, isOverlay = false, timeUnit = 'day
 
       <div className="kanban-card-meta">
         {schedule?.isCritical ? (
-          <span className="kanban-chip critical" title="On critical path">
-            Critical
+          <span className="kanban-chip critical" title={t('chip.criticalFull')}>
+            {t('chip.criticalFull')}
           </span>
         ) : schedule && schedule.totalSlack > 0 ? (
-          <span className="kanban-chip slack" title="Total slack">
-            slack: {schedule.totalSlack}{unitLabel(timeUnit)}
+          <span className="kanban-chip slack" title={t('chip.slack', { n: schedule.totalSlack, unit: unitLabel(timeUnit) })}>
+            {t('chip.slack', { n: schedule.totalSlack, unit: unitLabel(timeUnit) })}
           </span>
         ) : null}
         {task.duration > 0 ? (
-          <span className="kanban-chip" title="Duration">
-            Dur: {task.duration}{unitLabel(timeUnit)}
+          <span className="kanban-chip" title={t('task.duration')}>
+            {t('chip.duration', { n: task.duration, unit: unitLabel(timeUnit) })}
           </span>
         ) : null}
         {task.peopleRequired > 1 ? (
-          <span className="kanban-chip" title="People required">
-            👥 {task.peopleRequired}
+          <span className="kanban-chip" title={t('task.peopleRequired')}>
+            {t('chip.people', { n: task.peopleRequired })}
           </span>
         ) : null}
         {task.isBlocked ? (
-          <span className="kanban-chip blocked" title="Blocked by dependencies">
-            <Lock size={10} /> Blocked
+          <span className="kanban-chip blocked" title={t('chip.blocked')}>
+            <Lock size={10} /> {t('chip.blocked')}
           </span>
         ) : null}
         {task.subtaskStats?.total > 0 ? (
-          <span className="kanban-chip subtask" title="Subtasks done / total">
-            <GitBranch size={10} /> {task.subtaskStats.done}/{task.subtaskStats.total}
+          <span className="kanban-chip subtask" title={t('task.subtasks')}>
+            <GitBranch size={10} /> {t('chip.subtaskCount', { done: task.subtaskStats.done, total: task.subtaskStats.total })}
           </span>
         ) : null}
         {task.deadline ? (
