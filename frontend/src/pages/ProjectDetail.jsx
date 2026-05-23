@@ -49,6 +49,8 @@ import {
   deleteNotePermanent,
   getNoteComments,
   addNoteComment,
+  setDependencies,
+  createSubtask,
 } from '../services/noteService';
 import KanbanBoard from '../components/KanbanBoard';
 import TimeLogSection from '../components/TimeLogSection';
@@ -153,6 +155,14 @@ const ProjectDetail = () => {
     marginalCost: '',
   });
   const [taskSaving, setTaskSaving] = useState(false);
+
+  // Pre-save relations: only used while creating a new task (editingTaskId === null).
+  // pendingBlockers: array of task summary objects {id, title}.
+  // pendingSubtasks: array of {title, content} draft objects.
+  const [pendingBlockers, setPendingBlockers] = useState([]);
+  const [pendingSubtasks, setPendingSubtasks] = useState([]);
+  const [blockerQuery, setBlockerQuery] = useState('');
+  const [newSubtaskDraft, setNewSubtaskDraft] = useState({ title: '', content: '' });
 
   const [logItems, setLogItems] = useState([]);
   const [logLoading, setLogLoading] = useState(false);
@@ -505,6 +515,10 @@ const ProjectDetail = () => {
     setEditingTaskParent(null);
     setEditingSubtaskStats({ total: 0, done: 0 });
     setEditMode(false);
+    setPendingBlockers([]);
+    setPendingSubtasks([]);
+    setBlockerQuery('');
+    setNewSubtaskDraft({ title: '', content: '' });
   };
 
   const handleOpenCreateTask = () => {
@@ -589,8 +603,41 @@ const ProjectDetail = () => {
           setEditMode(false);
         }
       } else {
-        await createNote(payload);
-        toast.success('Task created');
+        const createResp = await createNote(payload);
+        const newTask = createResp?.note;
+        const newId = newTask?._id || newTask?.id;
+
+        // After the task exists, fire-and-collect dependency + subtask follow-ups.
+        // Failures here don't undo the create (the task is real), but we report
+        // them so the user can retry from the edit modal.
+        const followUpErrors = [];
+        if (newId) {
+          if (pendingBlockers.length) {
+            try {
+              await setDependencies(newId, pendingBlockers.map((b) => b.id));
+            } catch (err) {
+              followUpErrors.push(`dependencies: ${err.message}`);
+            }
+          }
+          for (const draft of pendingSubtasks) {
+            try {
+              await createSubtask(newId, {
+                title: draft.title,
+                content: draft.content,
+                project: id,
+              });
+            } catch (err) {
+              followUpErrors.push(`subtask "${draft.title || draft.content?.slice(0, 30)}": ${err.message}`);
+            }
+          }
+        }
+
+        if (followUpErrors.length) {
+          toast.warn(`Task created, but ${followUpErrors.length} follow-up(s) failed. Open task to retry.`);
+          followUpErrors.forEach((m) => console.warn(m));
+        } else {
+          toast.success('Task created');
+        }
         setShowTaskModal(false);
         resetTaskForm();
         await fetchTasks();
@@ -1769,6 +1816,145 @@ const ProjectDetail = () => {
               </div>
             </fieldset>
             </form>
+
+            {!editingTaskId ? (
+              <section className="task-precreate-relations">
+                <div className="precreate-block">
+                  <h4>Blocked by ({pendingBlockers.length})</h4>
+                  {pendingBlockers.length === 0 ? (
+                    <div className="muted small">No blockers selected.</div>
+                  ) : (
+                    <div className="pending-chip-row">
+                      {pendingBlockers.map((b) => (
+                        <span key={b.id} className="pending-chip">
+                          {b.title || '(untitled)'}
+                          <button
+                            type="button"
+                            className="pending-chip-x"
+                            onClick={() => setPendingBlockers((prev) => prev.filter((x) => x.id !== b.id))}
+                            aria-label="Remove blocker"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    className="custom-input"
+                    placeholder="Search project tasks to add as blocker…"
+                    value={blockerQuery}
+                    onChange={(e) => setBlockerQuery(e.target.value)}
+                  />
+                  {blockerQuery.trim() ? (
+                    <div className="picker-results">
+                      {(() => {
+                        const q = blockerQuery.trim().toLowerCase();
+                        const selectedIds = new Set(pendingBlockers.map((b) => b.id));
+                        const matches = (tasks || [])
+                          .filter((t) => {
+                            const id = String(t._id || t.id);
+                            if (selectedIds.has(id)) return false;
+                            return (t.title || '').toLowerCase().includes(q)
+                              || (t.content || '').toLowerCase().includes(q);
+                          })
+                          .slice(0, 8);
+                        if (matches.length === 0) {
+                          return <div className="muted small">No match.</div>;
+                        }
+                        return matches.map((t) => (
+                          <button
+                            key={String(t._id || t.id)}
+                            type="button"
+                            className="picker-row"
+                            onClick={() => {
+                              setPendingBlockers((prev) => [
+                                ...prev,
+                                { id: String(t._id || t.id), title: t.title || t.content?.slice(0, 60) || '(untitled)' },
+                              ]);
+                              setBlockerQuery('');
+                            }}
+                          >
+                            <span>{t.title || t.content?.slice(0, 60) || '(untitled)'}</span>
+                            {t.status === 'done' ? <span className="muted small">done</span> : null}
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="precreate-block">
+                  <h4>Subtasks ({pendingSubtasks.length})</h4>
+                  {pendingSubtasks.length === 0 ? (
+                    <div className="muted small">No subtasks queued.</div>
+                  ) : (
+                    <ul className="pending-sub-list">
+                      {pendingSubtasks.map((s, i) => (
+                        <li key={i}>
+                          <div className="pending-sub-text">
+                            <strong>{s.title || '(no title)'}</strong>
+                            {s.content ? <span className="muted small"> — {s.content}</span> : null}
+                          </div>
+                          <button
+                            type="button"
+                            className="pending-chip-x"
+                            onClick={() => setPendingSubtasks((prev) => prev.filter((_, j) => j !== i))}
+                            aria-label="Remove subtask"
+                          >
+                            <X size={10} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="precreate-sub-add">
+                    <input
+                      type="text"
+                      className="custom-input"
+                      placeholder="Subtask title (optional)"
+                      value={newSubtaskDraft.title}
+                      onChange={(e) => setNewSubtaskDraft({ ...newSubtaskDraft, title: e.target.value })}
+                    />
+                    <input
+                      type="text"
+                      className="custom-input"
+                      placeholder="Subtask content (required)"
+                      value={newSubtaskDraft.content}
+                      onChange={(e) => setNewSubtaskDraft({ ...newSubtaskDraft, content: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newSubtaskDraft.content.trim()) {
+                          e.preventDefault();
+                          setPendingSubtasks((prev) => [...prev, {
+                            title: newSubtaskDraft.title.trim(),
+                            content: newSubtaskDraft.content.trim(),
+                          }]);
+                          setNewSubtaskDraft({ title: '', content: '' });
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={!newSubtaskDraft.content.trim()}
+                      onClick={() => {
+                        setPendingSubtasks((prev) => [...prev, {
+                          title: newSubtaskDraft.title.trim(),
+                          content: newSubtaskDraft.content.trim(),
+                        }]);
+                        setNewSubtaskDraft({ title: '', content: '' });
+                      }}
+                    >
+                      <Plus size={14} /> Add
+                    </button>
+                  </div>
+                  <small className="muted">
+                    Subtasks and blockers are saved after the parent task is created.
+                  </small>
+                </div>
+              </section>
+            ) : null}
 
             {editingTaskId ? (
               <TaskRelationsSection
