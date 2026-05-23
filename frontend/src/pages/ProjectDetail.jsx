@@ -935,7 +935,7 @@ const ProjectDetail = () => {
                     className={ganttGranularity === m ? 'active' : ''}
                     onClick={() => setGanttGranularity(m)}
                   >
-                    {t(key)}
+                    {tr(key)}
                   </button>
                 ))}
               </div>
