@@ -14,13 +14,13 @@
   font-family: inherit;
 }
 
-/* frappe-gantt's wrapping `.gantt-container` MUST keep its computed
-   `height: var(--gv-grid-height)` — the inner `.gantt` SVG is positioned
-   absolutely against it. If we set the wrapper to `height: auto` the
-   container collapses to the sticky header height and the SVG disappears.
-   Instead we just enforce a sensible minimum so the panel feels roomy. */
+/* Height for empty / single-row case. ProjectGantt.jsx syncs the container
+   height to the SVG's intrinsic height after init so the last row isn't
+   clipped by the horizontal scrollbar. SVG must stay position:absolute
+   (lib expectation) — we never override its positioning. */
 .project-gantt-container .gantt-container {
   min-height: 320px;
+  overflow-y: visible !important;
 }
 
 /* Critical-path bars: red fill + red progress. */

@@ -65,7 +65,7 @@ export default {
   // ----- tabs
   'tab.board': 'Bảng Kanban',
   'tab.list': 'Danh sách',
-  'tab.timeline': 'Sơ đồ Gantt',
+  'tab.timeline': 'Sơ đồ',
   'tab.dashboard': 'Tổng quan',
   'tab.log': 'Nhật ký',
   'tab.settings': 'Cài đặt',
@@ -341,7 +341,7 @@ export default {
   'opt.badge.optimum': 'tối ưu',
   'opt.step.crash': 'Rút {tasks} (chi phí {cost})',
   'opt.step.none': 'không thể rút thêm',
-  'opt.step.start': '(bắt đầu — chưa rút)',
+  'opt.step.start': '(bắt đầu - chưa rút)',
   'opt.footer': 'Thời gian tối ưu: {dur}{unit} · Tổng chi phí: {total}',
   'opt.computing': 'Đang tính…',
 };

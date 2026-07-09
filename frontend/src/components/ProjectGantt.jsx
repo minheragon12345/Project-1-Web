@@ -111,17 +111,44 @@ export default function ProjectGantt({
       ganttRef.current = new Gantt(containerRef.current, ganttTasks, {
         view_mode: ganttViewMode,
         bar_height: 22,
-        padding: 16,
+        padding: 28,        // row spacing — wider rows = cleaner arrow routing
+        arrow_curve: 10,    // smoother bends than default 5
         on_click: (task) => {
           if (onTaskClick) onTaskClick(task.id);
         },
       });
+
+      // frappe-gantt's `.gantt-container` is sized via inline
+      // `height: var(--gv-grid-height)` which only covers the grid rows, not
+      // header + horizontal scrollbar — vertical scroll appears. Read the
+      // SVG's intrinsic height (set via SVG `height` attr by the lib) and
+      // resize the container to match. ResizeObserver keeps it in sync on
+      // view-mode changes that re-render the SVG.
+      const root = containerRef.current;
+      const syncHeight = () => {
+        const gc = root.querySelector('.gantt-container');
+        const svg = root.querySelector('svg.gantt');
+        if (!gc || !svg) return;
+        const attrH = parseFloat(svg.getAttribute('height'));
+        const rectH = svg.getBoundingClientRect().height;
+        const h = Math.max(Number.isFinite(attrH) ? attrH : 0, rectH);
+        if (h > 0) gc.style.height = `${Math.ceil(h) + 32}px`;
+      };
+      requestAnimationFrame(syncHeight);
+
+      const svgEl = root.querySelector('svg.gantt');
+      if (svgEl && typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(syncHeight);
+        ro.observe(svgEl);
+        ganttRef.current.__ro = ro;
+      }
     } catch (err) {
       console.error('frappe-gantt init failed:', err);
       ganttRef.current = null;
     }
 
     return () => {
+      if (ganttRef.current?.__ro) ganttRef.current.__ro.disconnect();
       if (containerRef.current) containerRef.current.innerHTML = '';
       ganttRef.current = null;
     };

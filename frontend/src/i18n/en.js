@@ -340,7 +340,7 @@ export default {
   'opt.badge.optimum': 'optimum',
   'opt.step.crash': 'Crash {tasks} (cost {cost})',
   'opt.step.none': 'no further crash possible',
-  'opt.step.start': '(start — no crash yet)',
+  'opt.step.start': '(start - no crash yet)',
   'opt.footer': 'Optimal duration: {dur}{unit} · Total cost: {total}',
   'opt.computing': 'Computing…',
 };
